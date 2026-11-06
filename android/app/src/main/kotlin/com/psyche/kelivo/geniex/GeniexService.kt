@@ -3,6 +3,7 @@ package com.psyche.kelivo.geniex
 import android.content.Context
 import android.util.Log
 import com.geniex.sdk.LlmWrapper
+import com.geniex.sdk.ModelManagerWrapper
 import com.geniex.sdk.bean.ChatMessage
 import com.geniex.sdk.bean.ComputeUnitValue
 import com.geniex.sdk.bean.LlmCreateInput
@@ -143,6 +144,16 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
                     val arr = JSONArray()
                     listModels().forEach { arr.put(JSONObject().put("id", it.name).put("object", "model")) }
                     json(JSONObject().put("object", "list").put("data", arr))
+                }
+                uri == "/registry" -> {
+                    val arr = JSONArray()
+                    try {
+                        val names = runBlocking(Dispatchers.IO) { ModelManagerWrapper.list() }
+                        names.forEach { arr.put(it) }
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "registry list failed: " + t.message)
+                    }
+                    json(JSONObject().put("registry", arr))
                 }
                 uri == "/load" && session.method == Method.POST -> {
                     val req = JSONObject(readBody(session))
