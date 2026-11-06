@@ -2,6 +2,7 @@ package com.psyche.kelivo.geniex
 
 import android.content.Context
 import android.util.Log
+import com.geniex.sdk.GenieXSdk
 import com.geniex.sdk.LlmWrapper
 import com.geniex.sdk.bean.ChatMessage
 import com.geniex.sdk.bean.ComputeUnitValue
@@ -30,6 +31,34 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
 
         @Volatile
         private var instance: GeniexService? = null
+
+        @Volatile
+        private var sdkReady = false
+
+        // Qualcomm GenieX SDK must be initialized before any LlmWrapper call:
+        // it loads libnpu_jni.so from nativeLibraryDir, creates files/geniex work dir,
+        // calls ModelManager.init(workdir) and registers llama_cpp + qairt plugins.
+        private fun ensureSdk(context: Context) {
+            if (sdkReady) return
+            synchronized(this) {
+                if (sdkReady) return
+                val latch = java.util.concurrent.CountDownLatch(1)
+                var err: String? = null
+                GenieXSdk.instance.init(context, object : GenieXSdk.InitCallback {
+                    override fun onSuccess() {
+                        Log.w(TAG, "GenieXSdk init OK")
+                        latch.countDown()
+                    }
+                    override fun onFailure(message: String) {
+                        err = message
+                        Log.e(TAG, "GenieXSdk init failed: " + message)
+                        latch.countDown()
+                    }
+                })
+                latch.await(60, java.util.concurrent.TimeUnit.SECONDS)
+                if (err == null) sdkReady = true else Log.e(TAG, "sdk init error: " + err)
+            }
+        }
 
         fun modelsDir(context: Context): File =
             File(context.getExternalFilesDir(null) ?: context.filesDir, "llm_models").apply { mkdirs() }
@@ -62,6 +91,7 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
             ?.sortedByDescending { it.length() } ?: emptyList()
 
     private fun autoLoad(dir: File) {
+        ensureSdk(appContext)
         val gguf = dir.listFiles { f -> f.extension == "gguf" }?.maxByOrNull { it.length() }
         if (gguf == null) {
             Log.w(TAG, "no gguf found, idle")
@@ -73,6 +103,7 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
     // Returns null on success, error message otherwise.
     private fun loadModel(gguf: File): String? {
         if (!gguf.exists()) return "model file missing: " + gguf.absolutePath
+        ensureSdk(appContext)
         unload()
         return try {
             val conf = ModelConfig(nCtx = 2048, nGpuLayers = -1, enable_thinking = false)
