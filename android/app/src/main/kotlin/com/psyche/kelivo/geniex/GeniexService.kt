@@ -15,14 +15,12 @@ import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
 // Kelivo built-in local NPU inference service (Qualcomm GenieX, llama_cpp runtime).
-// OpenAI-compatible HTTP API on 127.0.0.1:18800. Configure a custom provider in
-// Kelivo pointing to http://127.0.0.1:18800/v1 and use local models.
-// Models live in the app external files dir under llm_models, gguf files.
-// On startup the largest gguf is auto-loaded. POST /load with file name switches.
-// Official params: llama_cpp runtime (mmap layering), nGpuLayers=-1, nCtx=2048.
+// OpenAI-compatible HTTP API on 127.0.0.1:18800.
+// Models live in app external files dir under llm_models, gguf files.
 class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1", 18800) {
 
     companion object {
@@ -85,7 +83,9 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
                 compute_unit = ComputeUnitValue.NPU.value
             )
             Log.w(TAG, "loading " + gguf.name + " (" + gguf.length() / 1048576 + "MB) unit=npu ctx=2048")
-            val w = LlmWrapper.builder().llmCreateInput(input).build().getOrThrow()
+            val w = runBlocking(Dispatchers.IO) {
+                LlmWrapper.builder().llmCreateInput(input).build().getOrThrow()
+            }
             engineRef = w
             loadedFile = gguf.name
             Log.w(TAG, "loaded OK: " + gguf.name)
@@ -179,27 +179,29 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
             .put("id", "chatcmpl-local")
             .put("object", "chat.completion.chunk")
             .put("model", loadedFile ?: "local")
-        return NanoHTTPD.newChunkedResponse(Response.Status.OK, "text/event-stream") { out ->
-            try {
-                generateBlocking(w, req) { _, delta ->
-                    val chunk = JSONObject(chunkBase.toString())
-                        .put(
-                            "choices", JSONArray().put(
-                                JSONObject().put("index", 0)
-                                    .put("delta", JSONObject().put("content", delta))
+        return newChunkedResponse(Response.Status.OK, "text/event-stream", object : Response.IStreamer {
+            override fun stream(out: OutputStream) {
+                try {
+                    generateBlocking(w, req) { _, delta ->
+                        val chunk = JSONObject(chunkBase.toString())
+                            .put(
+                                "choices", JSONArray().put(
+                                    JSONObject().put("index", 0)
+                                        .put("delta", JSONObject().put("content", delta))
+                                )
                             )
-                        )
-                    out.write(("data: " + chunk.toString() + "\n\n").toByteArray())
+                        out.write(("data: " + chunk.toString() + "\n\n").toByteArray())
+                        out.flush()
+                    }
+                    out.write("data: [DONE]\n\n".toByteArray())
                     out.flush()
+                } catch (t: Throwable) {
+                    Log.e(TAG, "sse broken (client disconnect is ok): " + t.message)
+                } finally {
+                    generating.set(false)
                 }
-                out.write("data: [DONE]\n\n".toByteArray())
-                out.flush()
-            } catch (t: Throwable) {
-                Log.e(TAG, "sse broken (client disconnect is ok): " + t.message)
-            } finally {
-                generating.set(false)
             }
-        }
+        })
     }
 
     // Build messages, apply chat template, run streaming generation.
@@ -225,17 +227,17 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
             }
         }
         val userMsg = if (n > 0) msgs.getJSONObject(n - 1).optString("content") else ""
-        val chatMsgs = ArrayList<ChatMessage>()
-        chatMsgs.add(ChatMessage("system", system.toString().trim()))
-        for ((isUser, text) in history.takeLast(10)) {
-            chatMsgs.add(ChatMessage(if (isUser) "user" else "assistant", text))
-        }
-        chatMsgs.add(ChatMessage("user", userMsg))
-        val template = w.applyChatTemplate(chatMsgs.toTypedArray(), "[]", false)
-            .getOrThrow().formattedText
-        val genCfg = com.geniex.sdk.bean.GenerationConfig(maxTokens = maxTokens)
         val sb = StringBuilder()
         runBlocking(Dispatchers.IO) {
+            val chatMsgs = ArrayList<ChatMessage>()
+            chatMsgs.add(ChatMessage("system", system.toString().trim()))
+            for ((isUser, text) in history.takeLast(10)) {
+                chatMsgs.add(ChatMessage(if (isUser) "user" else "assistant", text))
+            }
+            chatMsgs.add(ChatMessage("user", userMsg))
+            val template = w.applyChatTemplate(chatMsgs.toTypedArray(), "[]", false)
+                .getOrThrow().formattedText
+            val genCfg = com.geniex.sdk.bean.GenerationConfig(maxTokens = maxTokens)
             w.generateStreamFlow(template, genCfg).collect { r ->
                 when (r) {
                     is LlmStreamResult.Token -> {
