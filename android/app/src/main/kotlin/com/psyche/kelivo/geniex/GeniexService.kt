@@ -44,7 +44,7 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
                 if (sdkReady) return
                 val latch = java.util.concurrent.CountDownLatch(1)
                 var err: String? = null
-                GenieXSdk.instance.init(context, object : GenieXSdk.InitCallback {
+                GenieXSdk.Companion.instance.init(context, object : GenieXSdk.InitCallback {
                     override fun onSuccess() {
                         Log.w(TAG, "GenieXSdk init OK")
                         latch.countDown()
