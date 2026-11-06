@@ -2,7 +2,6 @@ package com.psyche.kelivo.geniex
 
 import android.content.Context
 import android.util.Log
-import com.geniex.sdk.GenieXSdk
 import com.geniex.sdk.LlmWrapper
 import com.geniex.sdk.bean.ChatMessage
 import com.geniex.sdk.bean.ComputeUnitValue
@@ -39,25 +38,11 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
         // it loads libnpu_jni.so from nativeLibraryDir, creates files/geniex work dir,
         // calls ModelManager.init(workdir) and registers llama_cpp + qairt plugins.
         private fun ensureSdk(context: Context) {
-            if (sdkReady) return
-            synchronized(this) {
-                if (sdkReady) return
-                val latch = java.util.concurrent.CountDownLatch(1)
-                var err: String? = null
-                GenieXSdk.Companion.instance.init(context, object : GenieXSdk.InitCallback {
-                    override fun onSuccess() {
-                        Log.w(TAG, "GenieXSdk init OK")
-                        latch.countDown()
-                    }
-                    override fun onFailure(message: String) {
-                        err = message
-                        Log.e(TAG, "GenieXSdk init failed: " + message)
-                        latch.countDown()
-                    }
-                })
-                latch.await(60, java.util.concurrent.TimeUnit.SECONDS)
-                if (err == null) sdkReady = true else Log.e(TAG, "sdk init error: " + err)
-            }
+            // Kotlin source cannot access GenieXSdk.instance (private in metadata);
+            // SdkBridge.java calls the public Companion.getInstance() at bytecode level.
+            val ok = SdkBridge.ensure(context)
+            sdkReady = ok
+            if (!ok) Log.e(TAG, "ensureSdk: sdk init failed")
         }
 
         fun modelsDir(context: Context): File =
