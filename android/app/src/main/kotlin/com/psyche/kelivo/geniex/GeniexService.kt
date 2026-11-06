@@ -86,21 +86,28 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
     }
 
     // Returns null on success, error message otherwise.
-    private fun loadModel(gguf: File): String? {
+    private fun loadModel(gguf: File, unit: String = "npu", ctx: Int = 2048): String? {
         if (!gguf.exists()) return "model file missing: " + gguf.absolutePath
         ensureSdk(appContext)
         unload()
         return try {
-            val conf = ModelConfig(nCtx = 2048, nGpuLayers = -1, enable_thinking = false)
+            // nGpuLayers must be 0 for llama_cpp runtime (official sample): NPU offload is
+            // driven by compute_unit, passing -1 segfaults inside geniex_llm_create.
+            val conf = ModelConfig(nCtx = ctx, nGpuLayers = 0, enable_thinking = false)
             val input = LlmCreateInput(
                 model_name = gguf.nameWithoutExtension,
                 model_path = gguf.absolutePath,
                 tokenizer_path = gguf.absolutePath,
                 config = conf,
                 runtime_id = "llama_cpp",
-                compute_unit = ComputeUnitValue.NPU.value
+                compute_unit = when (unit) {
+                "gpu" -> ComputeUnitValue.GPU.value
+                "cpu" -> ComputeUnitValue.CPU.value
+                "hybrid" -> ComputeUnitValue.HYBRID.value
+                else -> ComputeUnitValue.NPU.value
+            }
             )
-            Log.w(TAG, "loading " + gguf.name + " (" + gguf.length() / 1048576 + "MB) unit=npu ctx=2048")
+            Log.w(TAG, "loading " + gguf.name + " (" + gguf.length() / 1048576 + "MB) unit=" + unit + " ctx=" + ctx)
             val w = runBlocking(Dispatchers.IO) {
                 LlmWrapper.builder().llmCreateInput(input).build().getOrThrow()
             }
@@ -138,10 +145,11 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
                     json(JSONObject().put("object", "list").put("data", arr))
                 }
                 uri == "/load" && session.method == Method.POST -> {
-                    val name = JSONObject(readBody(session)).optString("file")
+                    val req = JSONObject(readBody(session))
+                    val name = req.optString("file")
                     val f = listModels().firstOrNull { it.name == name }
                         ?: return json(JSONObject().put("ok", false).put("error", "model not found"), 404)
-                    val err = loadModel(f)
+                    val err = loadModel(f, req.optString("unit", "npu"), req.optInt("ctx", 2048))
                     json(JSONObject().put("ok", err == null).put("error", err ?: JSONObject.NULL))
                 }
                 uri == "/v1/chat/completions" && session.method == Method.POST ->
