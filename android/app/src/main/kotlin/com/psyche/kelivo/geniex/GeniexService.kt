@@ -134,8 +134,8 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
         var tokPath: String? = null
         try {
             val ps = runBlocking(Dispatchers.IO) { ModelManagerWrapper.getPaths(gguf.nameWithoutExtension) }
-            regPath = ps.model_path
-            tokPath = ps.tokenizer_path
+            regPath = ps?.model_path
+            tokPath = ps?.tokenizer_path
         } catch (t: Throwable) {
             Log.w(TAG, "getPaths failed: " + t.message)
         }
@@ -144,8 +144,8 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
             if (rerr != null) return "not in registry, register failed: " + rerr
             try {
                 val ps = runBlocking(Dispatchers.IO) { ModelManagerWrapper.getPaths(gguf.nameWithoutExtension) }
-                regPath = ps.model_path
-                tokPath = ps.tokenizer_path
+                regPath = ps?.model_path
+                tokPath = ps?.tokenizer_path
             } catch (t: Throwable) {
                 Log.w(TAG, "getPaths after register failed: " + t.message)
             }
