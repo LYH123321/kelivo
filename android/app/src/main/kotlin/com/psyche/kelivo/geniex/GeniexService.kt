@@ -6,6 +6,9 @@ import com.geniex.sdk.LlmWrapper
 import com.geniex.sdk.ModelManagerWrapper
 import com.geniex.sdk.bean.ChatMessage
 import com.geniex.sdk.bean.ComputeUnitValue
+import com.geniex.sdk.bean.HubSource
+import com.geniex.sdk.bean.ModelPullInput
+import com.geniex.sdk.bean.ModelType
 import com.geniex.sdk.bean.LlmCreateInput
 import com.geniex.sdk.bean.LlmStreamResult
 import com.geniex.sdk.bean.ModelConfig
@@ -86,19 +89,76 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
         loadModel(gguf)
     }
 
+    // Registers a local gguf into the ModelManager registry via LOCALFS pull.
+    // geniex_llm_create looks up the model by name in this registry; missing
+    // entries make it return NULL paths and segfault on strlen (observed at
+    // geniex_llm_create+748). Returns null on success, error message otherwise.
+    private fun registerLocal(gguf: File): String? {
+        ensureSdk(appContext)
+        val name = gguf.nameWithoutExtension
+        return try {
+            val input = ModelPullInput(
+                model_name = name,
+                hub = HubSource.LOCALFS,
+                local_path = gguf.absolutePath,
+                model_type = ModelType.LLM
+            )
+            Log.w(TAG, "register local: " + gguf.name)
+            var err: String? = null
+            runBlocking(Dispatchers.IO) {
+                ModelManagerWrapper.pullFlow(input).collect { ev ->
+                    when (ev) {
+                        is ModelManagerWrapper.PullEvent.Error -> {
+                            err = "pull error " + ev.code + ": " + ev.message
+                            Log.e(TAG, err ?: "")
+                        }
+                        is ModelManagerWrapper.PullEvent.Completed -> Log.w(TAG, "pull completed")
+                        else -> {}
+                    }
+                }
+            }
+            if (err == null) Log.w(TAG, "register OK: " + name)
+            err
+        } catch (t: Throwable) {
+            Log.e(TAG, "register failed: " + t.message, t)
+            t.message ?: "register failed"
+        }
+    }
     // Returns null on success, error message otherwise.
     private fun loadModel(gguf: File, unit: String = "npu", ctx: Int = 2048): String? {
         if (!gguf.exists()) return "model file missing: " + gguf.absolutePath
         ensureSdk(appContext)
         unload()
+        // Resolve real paths from the registry; register on first use.
+        var regPath: String? = null
+        var tokPath: String? = null
+        try {
+            val ps = runBlocking(Dispatchers.IO) { ModelManagerWrapper.getPaths(gguf.nameWithoutExtension) }
+            regPath = ps.model_path
+            tokPath = ps.tokenizer_path
+        } catch (t: Throwable) {
+            Log.w(TAG, "getPaths failed: " + t.message)
+        }
+        if (regPath == null) {
+            val rerr = registerLocal(gguf)
+            if (rerr != null) return "not in registry, register failed: " + rerr
+            try {
+                val ps = runBlocking(Dispatchers.IO) { ModelManagerWrapper.getPaths(gguf.nameWithoutExtension) }
+                regPath = ps.model_path
+                tokPath = ps.tokenizer_path
+            } catch (t: Throwable) {
+                Log.w(TAG, "getPaths after register failed: " + t.message)
+            }
+        }
+        Log.w(TAG, "registry path: " + (regPath ?: "<null, fallback to local file>"))
         return try {
             // nGpuLayers must be 0 for llama_cpp runtime (official sample): NPU offload is
             // driven by compute_unit, passing -1 segfaults inside geniex_llm_create.
             val conf = ModelConfig(nCtx = ctx, nGpuLayers = 0, enable_thinking = false)
             val input = LlmCreateInput(
                 model_name = gguf.nameWithoutExtension,
-                model_path = gguf.absolutePath,
-                tokenizer_path = gguf.absolutePath,
+                model_path = regPath ?: gguf.absolutePath,
+                tokenizer_path = tokPath ?: regPath ?: gguf.absolutePath,
                 config = conf,
                 runtime_id = "llama_cpp",
                 compute_unit = when (unit) {
@@ -160,6 +220,12 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
                     val name = req.optString("file")
                     val f = listModels().firstOrNull { it.name == name }
                         ?: return json(JSONObject().put("ok", false).put("error", "model not found"), 404)
+                    if (req.optBoolean("register", false)) {
+                        val rerr = registerLocal(f)
+                        if (rerr != null) {
+                            return json(JSONObject().put("ok", false).put("error", "register failed: " + rerr), 500)
+                        }
+                    }
                     val err = loadModel(f, req.optString("unit", "npu"), req.optInt("ctx", 2048))
                     json(JSONObject().put("ok", err == null).put("error", err ?: JSONObject.NULL))
                 }
