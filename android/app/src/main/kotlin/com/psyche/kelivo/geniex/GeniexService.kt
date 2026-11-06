@@ -16,6 +16,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.OutputStream
+import java.io.PipedInputStream
+import java.io.PipedOutputStream
 import java.util.concurrent.atomic.AtomicBoolean
 
 // Kelivo built-in local NPU inference service (Qualcomm GenieX, llama_cpp runtime).
@@ -179,29 +181,31 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
             .put("id", "chatcmpl-local")
             .put("object", "chat.completion.chunk")
             .put("model", loadedFile ?: "local")
-        return newChunkedResponse(Response.Status.OK, "text/event-stream", object : Response.IStreamer {
-            override fun stream(out: OutputStream) {
-                try {
-                    generateBlocking(w, req) { _, delta ->
-                        val chunk = JSONObject(chunkBase.toString())
-                            .put(
-                                "choices", JSONArray().put(
-                                    JSONObject().put("index", 0)
-                                        .put("delta", JSONObject().put("content", delta))
-                                )
+        val pipedIn = PipedInputStream(64 * 1024)
+        val pipedOut = PipedOutputStream(pipedIn)
+        Thread {
+            try {
+                generateBlocking(w, req) { _, delta ->
+                    val chunk = JSONObject(chunkBase.toString())
+                        .put(
+                            "choices", JSONArray().put(
+                                JSONObject().put("index", 0)
+                                    .put("delta", JSONObject().put("content", delta))
                             )
-                        out.write(("data: " + chunk.toString() + "\n\n").toByteArray())
-                        out.flush()
-                    }
-                    out.write("data: [DONE]\n\n".toByteArray())
-                    out.flush()
-                } catch (t: Throwable) {
-                    Log.e(TAG, "sse broken (client disconnect is ok): " + t.message)
-                } finally {
-                    generating.set(false)
+                        )
+                    pipedOut.write(("data: " + chunk.toString() + "\n\n").toByteArray())
+                    pipedOut.flush()
                 }
+                pipedOut.write("data: [DONE]\n\n".toByteArray())
+                pipedOut.flush()
+            } catch (t: Throwable) {
+                Log.e(TAG, "sse broken (client disconnect is ok): " + t.message)
+            } finally {
+                generating.set(false)
+                try { pipedOut.close() } catch (_: Throwable) {}
             }
-        })
+        }.start()
+        return newChunkedResponse(Response.Status.OK, "text/event-stream", pipedIn)
     }
 
     // Build messages, apply chat template, run streaming generation.
