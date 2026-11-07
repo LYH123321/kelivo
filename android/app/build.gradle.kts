@@ -72,6 +72,14 @@ android {
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
+            // Flutter release builds force R8 shrinking on; it strips GenieX SDK
+            // enum beans that libnpu_jni.so resolves by name via JNI.
+            isMinifyEnabled = false
+            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
