@@ -18,7 +18,11 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.BufferedReader
 import java.io.File
+import java.io.FileReader
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.OutputStream
 import java.io.PipedInputStream
 import java.io.PipedOutputStream
@@ -79,14 +83,56 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
         modelsDir(appContext).listFiles { f -> f.extension == "gguf" }
             ?.sortedByDescending { it.length() } ?: emptyList()
 
+    // Never auto-load at startup: loading is user-triggered via /load only.
+    // Auto-loading a big gguf can eat all RAM and freeze the device.
     private fun autoLoad(dir: File) {
         ensureSdk(appContext)
-        val gguf = dir.listFiles { f -> f.extension == "gguf" }?.maxByOrNull { it.length() }
-        if (gguf == null) {
-            Log.w(TAG, "no gguf found, idle")
-            return
+        val n = dir.listFiles { f -> f.extension == "gguf" }?.size ?: 0
+        Log.w(TAG, "idle: $n gguf(s) available, waiting for explicit /load")
+    }
+
+    // Scan well-known folders for *.gguf and import (copy) them into llm_models.
+    // Returns JSON object with imported entries; already-present files (by name) are skipped.
+    private fun importScan(): JSONObject {
+        val out = JSONArray()
+        val dst = modelsDir(appContext)
+        val roots = listOfNotNull(
+            android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS),
+            File("/sdcard/Download"),
+            File("/sdcard/Download/Live2D")
+        ).filter { it.isDirectory }.distinct()
+        val seen = HashSet<String>()
+        dst.listFiles { f -> f.extension == "gguf" }?.forEach { seen.add(it.name) }
+        for (root in roots) {
+            val cands = root.listFiles { f -> f.extension == "gguf" } ?: continue
+            for (f in cands) {
+                if (seen.contains(f.name)) continue
+                // Skip files under 50MB — not a real LLM gguf
+                if (f.length() < 50L * 1024 * 1024) continue
+                try {
+                    val target = File(dst, f.name)
+                    if (!target.exists()) {
+                        // hardlink first (instant, zero extra disk); fallback to stream copy
+                        val linked = try {
+                            android.system.Os.link(f.absolutePath, target.absolutePath)
+                            true
+                        } catch (_: Throwable) { false }
+                        if (!linked) {
+                            FileInputStream(f).use { ins ->
+                                FileOutputStream(target).use { outs ->
+                                    ins.copyTo(outs, 1024 * 1024)
+                                }
+                            }
+                        }
+                    }
+                    seen.add(f.name)
+                    out.put(JSONObject().put("name", f.name).put("size", f.length()))
+                } catch (t: Throwable) {
+                    Log.w(TAG, "import " + f.name + " failed: " + t.message)
+                }
+            }
         }
-        loadModel(gguf)
+        return JSONObject().put("imported", out).put("available", JSONArray(listModels().map { it.name }))
     }
 
     // Registers a local gguf into the ModelManager registry via LOCALFS pull.
@@ -217,11 +263,27 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
                     }
                     json(JSONObject().put("registry", arr))
                 }
+                uri == "/import" && session.method == Method.POST -> {
+                    val r = importScan()
+                    r.put("loaded", loadedFile ?: JSONObject.NULL)
+                    json(r)
+                }
                 uri == "/load" && session.method == Method.POST -> {
                     val req = JSONObject(readBody(session))
                     val name = req.optString("file")
                     val f = listModels().firstOrNull { it.name == name }
                         ?: return json(JSONObject().put("ok", false).put("error", "model not found"), 404)
+                    // OOM guard: model must fit in available RAM with headroom.
+                    // Q4 gguf needs roughly 1.25x its size as RSS when loaded via mmap.
+                    val avail = readMemAvailable()
+                    val need = (f.length() * 1.25).toLong()
+                    if (avail < need && !req.optBoolean("force", false)) {
+                        return json(JSONObject()
+                            .put("ok", false)
+                            .put("error", "not enough memory: model needs ~" + need / 1048576 + "MB, only " + avail / 1048576 + "MB available. Use a smaller model or pass force=true")
+                            .put("needMB", need / 1048576)
+                            .put("availMB", avail / 1048576), 507)
+                    }
                     if (req.optBoolean("register", false)) {
                         val rerr = registerLocal(f)
                         if (rerr != null) {
@@ -248,6 +310,14 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
         session.parseBody(map)
         return map["postData"] ?: ""
     }
+
+    // System-wide MemAvailable in bytes (from /proc/meminfo).
+    private fun readMemAvailable(): Long = try {
+        BufferedReader(FileReader("/proc/meminfo")).useLines { lines ->
+            lines.firstOrNull { it.startsWith("MemAvailable") }
+                ?.split(Regex("\\s+"))?.getOrNull(1)?.toLong()?.times(1024)
+        } ?: 0L
+    } catch (_: Throwable) { 0L }
 
     private fun json(obj: JSONObject, status: Int = 200): Response =
         newFixedLengthResponse(
