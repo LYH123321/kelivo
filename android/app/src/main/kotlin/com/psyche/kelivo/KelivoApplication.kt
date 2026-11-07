@@ -17,6 +17,7 @@ class KelivoApplication : Application() {
         super.onCreate()
         // Local NPU inference service (OpenAI-compatible on 127.0.0.1:18800)
         GeniexService.start(this)
+        com.psyche.kelivo.geniex.SkillsHttp.start(this)
     }
     val backgroundRuntime by lazy { BackgroundRuntime(this) }
     val scheduledTasks by lazy { ScheduledTasks(this) }
