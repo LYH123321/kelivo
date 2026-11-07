@@ -100,7 +100,9 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
             val input = ModelPullInput(
                 model_name = name,
                 hub = HubSource.LOCALFS,
-                local_path = gguf.absolutePath,
+                // LOCALFS expects a DIRECTORY containing *.gguf (HF GGUF layout),
+                // not a single file: "expected a directory with *.gguf".
+                local_path = gguf.parentFile?.absolutePath ?: gguf.absolutePath,
                 model_type = ModelType.LLM
             )
             Log.w(TAG, "register local: " + gguf.name)
