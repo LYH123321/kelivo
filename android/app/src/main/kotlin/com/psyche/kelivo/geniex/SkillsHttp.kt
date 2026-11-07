@@ -7,6 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileReader
 
 /**
@@ -49,13 +50,20 @@ class SkillsHttp private constructor(context: Context) :
             if (!f.exists() || !f.canonicalPath.startsWith(dir.canonicalPath)) {
                 return resp("{\"error\":\"not found\"}", 404)
             }
+            val text = try { FileInputStream(f).use { it.readBytes().toString(Charsets.UTF_8) } }
+                catch (t: Throwable) { return resp("{\"error\":\"" + t.message + "\"}", 500) }
             return newFixedLengthResponse(
-                Response.Status.OK, "text/markdown; charset=utf-8", f.readText()
+                Response.Status.OK, "text/markdown; charset=utf-8", text
             )
         }
         val arr = JSONArray()
         dir.listFiles { it.isFile }?.forEach { f ->
-            arr.put(JSONObject().put("name", f.name).put("size", f.length()))
+            try {
+                FileInputStream(f).use { ins ->
+                    val text = ins.readBytes().toString(Charsets.UTF_8)
+                    arr.put(JSONObject().put("name", f.name).put("size", f.length()))
+                }
+            } catch (_: Throwable) { }
         }
         return resp(JSONObject().put("skills", arr).put("dir", dir.absolutePath).toString(), 200)
     }
