@@ -35,7 +35,7 @@ class SkillsHttp private constructor(context: Context) :
             synchronized(this) {
                 if (instance == null) {
                     instance = SkillsHttp(context.applicationContext).also {
-                        it.start(SOCKET_READ_TIMEOUT, 0)
+                        it.start(5000, true)
                         Log.w(TAG, "listening 127.0.0.1:18801")
                     }
                 }
