@@ -319,11 +319,13 @@ class GeniexService private constructor(context: Context) : NanoHTTPD("127.0.0.1
         } ?: 0L
     } catch (_: Throwable) { 0L }
 
-    private fun json(obj: JSONObject, status: Int = 200): Response =
-        newFixedLengthResponse(
-            if (status == 200) Response.Status.OK else Response.Status.lookup(status),
-            "application/json", obj.toString()
-        )
+    private fun json(obj: JSONObject, status: Int = 200): Response {
+        val st = if (status == 200) Response.Status.OK else Response.Status.lookup(status)
+            // lookup() returns null for non-standard codes (e.g. 507) and NanoHTTPD
+            // then throws "Status can't be null" — crash-proof fallback:
+            ?: Response.Status.INTERNAL_ERROR
+        return newFixedLengthResponse(st, "application/json", obj.toString())
+    }
 
     private fun handleChat(req: JSONObject): Response {
         val w = engineRef
