@@ -7,6 +7,7 @@ import com.psyche.kelivo.workspace.WorkspacePlugin
 import com.psyche.kelivo.scheduled.ScheduledTasks
 import com.psyche.kelivo.input.NativeMessageInputPlugin
 import com.psyche.kelivo.geniex.GeniexService
+import com.psyche.kelivo.rootmcp.RootService
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
 
@@ -18,6 +19,8 @@ class KelivoApplication : Application() {
         // Local NPU inference service (OpenAI-compatible on 127.0.0.1:18800)
         GeniexService.start(this)
         com.psyche.kelivo.geniex.SkillsHttp.start(this)
+        // Built-in Root MCP server (streamable HTTP on 127.0.0.1:18990/mcp)
+        RootService.start(this)
     }
     val backgroundRuntime by lazy { BackgroundRuntime(this) }
     val scheduledTasks by lazy { ScheduledTasks(this) }
