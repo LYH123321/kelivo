@@ -105,7 +105,7 @@ class RootService private constructor() : NanoHTTPD("127.0.0.1", 18990) {
             .put("isError", isError)
     }
 
-    private fun json(code: ResponseStatus, body: String): Response =
+    private fun json(code: Response.Status, body: String): Response =
         newFixedLengthResponse(code, "application/json", body)
 
     override fun serve(session: IHTTPSession): Response {
@@ -130,7 +130,10 @@ class RootService private constructor() : NanoHTTPD("127.0.0.1", 18990) {
             return json(Response.Status.NOT_FOUND, """{"error":"not found"}""")
         }
         val body = StringBuilder()
-        session.parseBody(mapOf("postData" to body))
+        val files = HashMap<String, String>()
+        files["postData"] = ""
+        session.parseBody(files)
+        body.append(files["postData"] ?: "")
         val req = try { JSONObject(body.toString()) } catch (e: Exception) {
             return json(Response.Status.BAD_REQUEST, """{"error":"bad json"}""")
         }
