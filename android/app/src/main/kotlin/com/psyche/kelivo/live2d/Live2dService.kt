@@ -67,6 +67,10 @@ object Live2dService {
         floating?.eval("window.kelivoSpeak && window.kelivoSpeak(" + jsString(text) + ")")
     }
 
+    fun setTransform(scale: Float, flip: Boolean, x: Float, y: Float) {
+        floating?.eval("window.kelivoSetTransform && window.kelivoSetTransform($scale, $flip, $x, $y)")
+    }
+
     private fun jsString(s: String): String {
         val sb = StringBuilder("\"")
         for (ch in s) {
@@ -313,16 +317,35 @@ function initPixi(){
   }).catch(function(e){});
 }
 
-function fit(){
+var curScale = 1.0;
+var curFlip = 1.0;
+var posX = 0.62;
+var posY = 1.0;
+var baseScale = 1.0;
+
+function applyTransform(){
   if (!model || !natW || !natH) return;
   var sw = window.innerWidth, sh = window.innerHeight;
   var targetH = sh * 0.75;
   var targetW = sw * 0.60;
-  var scale = Math.min(targetH / natH, targetW / natW);
-  model.scale.set(scale);
-  model.x = sw * 0.62;
-  model.y = sh;
+  baseScale = Math.min(targetH / natH, targetW / natW);
+  var finalS = baseScale * curScale;
+  model.scale.set(finalS * curFlip, finalS);
+  model.x = sw * posX;
+  model.y = sh * posY;
 }
+
+function fit(){
+  applyTransform();
+}
+
+window.kelivoSetTransform = function(s, flip, x, y){
+  curScale = s;
+  curFlip = flip ? -1.0 : 1.0;
+  posX = x;
+  posY = y;
+  applyTransform();
+};
 
 function startIdle(){
   setInterval(function(){

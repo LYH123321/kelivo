@@ -83,4 +83,22 @@ class Live2dBridge {
     } on PlatformException {
     } on MissingPluginException {}
   }
+
+  /// 调整桌宠模型大小、水平翻转与相对屏幕位置
+  static Future<void> setTransform({
+    required double scale,
+    required bool flip,
+    required double x,
+    required double y,
+  }) async {
+    try {
+      await _ch.invokeMethod('setTransform', {
+        'scale': scale,
+        'flip': flip,
+        'x': x,
+        'y': y,
+      });
+    } on PlatformException {
+    } on MissingPluginException {}
+  }
 }

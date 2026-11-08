@@ -185,6 +185,14 @@ class MainActivity : FlutterActivity() {
                     Live2dService.speak(call.argument<String>("text") ?: "")
                     result.success(true)
                 }
+                "setTransform" -> {
+                    val scale = (call.argument<Double>("scale") ?: 1.0).toFloat()
+                    val flip = call.argument<Boolean>("flip") ?: false
+                    val x = (call.argument<Double>("x") ?: 0.62).toFloat()
+                    val y = (call.argument<Double>("y") ?: 1.0).toFloat()
+                    Live2dService.setTransform(scale, flip, x, y)
+                    result.success(true)
+                }
                 "canDrawOverlays" -> {
                     val ctx = applicationContext
                     result.success(
