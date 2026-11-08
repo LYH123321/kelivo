@@ -121,6 +121,14 @@ object Live2dService {
 
             if (path.isEmpty()) path = "index.html"
             if (path == "live2d.html") {
+                val localHtml = java.io.File("/sdcard/Kelivo/live2d/live2d.html")
+                if (localHtml.exists() && localHtml.isFile) {
+                    return newChunkedResponse(
+                        Response.Status.OK,
+                        "text/html",
+                        java.io.FileInputStream(localHtml)
+                    )
+                }
                 return newChunkedResponse(
                     Response.Status.OK,
                     "text/html",
@@ -336,7 +344,7 @@ function applyTransform(){
 }
 
 function fit(){
-  applyTransform();
+  applyTransform(); setupMouthSync();
 }
 
 window.kelivoSetTransform = function(s, flip, x, y){
@@ -367,22 +375,30 @@ function startIdle(){
 window.kelivoSpeak = function(text){
   try {
     if (!model) return;
-    var core = model.internalModel && model.internalModel.coreModel;
-    if (!core || !core.setParameterValueById) return;
-    var dur = Math.max(1200, Math.min(6000, (text ? text.length : 10) * 120));
-    var t0 = Date.now();
-    clearInterval(window.__mouthTimer);
-    window.__mouthTimer = setInterval(function(){
-      var p = (Date.now()-t0)/dur;
-      if (p >= 1) {
-        clearInterval(window.__mouthTimer);
-        core.setParameterValueById('ParamMouthOpenY', 0);
-        return;
-      }
-      core.setParameterValueById('ParamMouthOpenY', Math.abs(Math.sin(Date.now()/90))*0.6);
-    }, 50);
+    var dur = Math.max(1500, Math.min(10000, (text ? text.length : 10) * 160));
+    window.__mouthEndTime = Date.now() + dur;
   } catch(e){}
 };
+
+function setupMouthSync(){
+  try {
+    if (!app || !app.ticker) return;
+    app.ticker.add(function(){
+      if (!model) return;
+      var core = model.internalModel && model.internalModel.coreModel;
+      if (!core || !core.setParameterValueById) return;
+      if (window.__mouthEndTime && Date.now() < window.__mouthEndTime) {
+        var v = Math.abs(Math.sin(Date.now() / 85)) * 0.75;
+        core.setParameterValueById('ParamMouthOpenY', v);
+        if (core.setParamFloat) core.setParamFloat('PARAM_MOUTH_OPEN_Y', v);
+      } else if (window.__mouthEndTime) {
+        window.__mouthEndTime = 0;
+        core.setParameterValueById('ParamMouthOpenY', 0);
+        if (core.setParamFloat) core.setParamFloat('PARAM_MOUTH_OPEN_Y', 0);
+      }
+    });
+  } catch(e){}
+}
 
 function boot(){
   if (window.PIXI && window.PIXI.live2d) initPixi();
