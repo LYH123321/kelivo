@@ -124,16 +124,25 @@ object Live2dService {
                 )
             }
 
+            val ext = path.substringAfterLast('.', "").lowercase()
+            val mimeType = mime[ext] ?: "application/octet-stream"
+
+            // 1. 优先尝试从本地 SD 卡自定义目录读取 /sdcard/Kelivo/live2d/
+            val sdFile = java.io.File("/sdcard/Kelivo/live2d/" + path.removePrefix("custom/"))
+            if (sdFile.exists() && sdFile.isFile) {
+                return try {
+                    newChunkedResponse(Response.Status.OK, mimeType, java.io.FileInputStream(sdFile))
+                } catch (e: Exception) {
+                    notFound()
+                }
+            }
+
+            // 2. 尝试从 assets/live2d/ 内置目录读取
             val assetPath = "live2d/" + path
             return try {
                 val ctx = appContext ?: return notFound()
                 val stream: InputStream = ctx.assets.open(assetPath)
-                val ext = assetPath.substringAfterLast('.', "").lowercase()
-                newChunkedResponse(
-                    Response.Status.OK,
-                    mime[ext] ?: "application/octet-stream",
-                    stream
-                )
+                newChunkedResponse(Response.Status.OK, mimeType, stream)
             } catch (e: Exception) {
                 notFound()
             }
@@ -239,42 +248,7 @@ object Live2dService {
 <style>html,body{margin:0;padding:0;background:transparent;overflow:hidden;height:100%}
 canvas{display:block}</style>
 <script>
-(function(){
-  try {
-    var _origGetContext = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function(type){
-      var ctx = _origGetContext.apply(this, arguments);
-      if (ctx && (type==='webgl2'||type==='webgl'||type==='experimental-webgl')) {
-        try {
-          var _origTP = ctx.texParameteri.bind(ctx);
-          ctx.texParameteri = function(target,pname,param){
-            if (target === ctx.TEXTURE_2D){
-              if (pname === ctx.TEXTURE_MIN_FILTER){
-                if (param===ctx.LINEAR_MIPMAP_LINEAR||param===ctx.LINEAR_MIPMAP_NEAREST||
-                    param===ctx.NEAREST_MIPMAP_LINEAR||param===ctx.NEAREST_MIPMAP_NEAREST){
-                  return _origTP(target,pname,ctx.LINEAR);
-                }
-              }
-              if ((pname===ctx.TEXTURE_WRAP_S||pname===ctx.TEXTURE_WRAP_T)&&
-                  (param===ctx.REPEAT||param===ctx.MIRRORED_REPEAT)){
-                return _origTP(target,pname,ctx.CLAMP_TO_EDGE);
-              }
-            }
-            return _origTP(target,pname,param);
-          };
-          var _origPB = ctx.pixelStorei.bind(ctx);
-          ctx.pixelStorei = function(pname,param){
-            if (pname === ctx.UNPACK_PREMULTIPLY_ALPHA_WEBGL && param === true) {
-              return;
-            }
-            return _origPB(pname,param);
-          };
-        } catch(e){}
-      }
-      return ctx;
-    };
-  } catch(e){}
-})();
+// Clean WebGL context without breaking Live2D V2/V3 shaders
 </script>
 <script src="http://127.0.0.1:18888/js/live2dcubismcore.min.js"></script>
 <script src="http://127.0.0.1:18888/js/live2d.min.js"></script>
@@ -289,11 +263,16 @@ function qs(k){ var m=location.search.match(new RegExp('[?&]'+k+'=([^&]*)')); re
 
 function initPixi(){
   PIXI.live2d.Live2DModel.registerTicker(PIXI.Ticker);
+  var dpr = window.devicePixelRatio || 2;
   app = new PIXI.Application({
     view: document.getElementById('c'),
+    backgroundAlpha: 0,
     transparent: true,
     autoDensity: true,
-    resizeTo: window
+    resolution: Math.min(dpr, 3), // 超清分辨率适配
+    resizeTo: window,
+    antialias: true,
+    powerPreference: 'high-performance'
   });
   window.addEventListener('resize', function(){
     if (app) app.renderer.resize(window.innerWidth, window.innerHeight);
@@ -301,7 +280,7 @@ function initPixi(){
   });
   var rel = qs('model') || 'models/PurpleBird/PurpleBird.model3.json';
   var url = 'http://127.0.0.1:18888/' + rel.replace(/^\/+/,'');
-  PIXI.live2d.Live2DModel.from(url).then(function(m){
+  PIXI.live2d.Live2DModel.from(url, { autoInteract: false }).then(function(m){
     model = m;
     app.stage.addChild(m);
     m.anchor.set(0.5, 1.0);
