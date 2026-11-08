@@ -259,7 +259,29 @@ canvas{display:block}</style>
 <canvas id="c"></canvas>
 <script>
 var app=null, model=null, natW=0, natH=0;
+var scale=1.0, flipX=1.0;
 function qs(k){ var m=location.search.match(new RegExp('[?&]'+k+'=([^&]*)')); return m?decodeURIComponent(m[1]):''; }
+
+// 拖拽与缩放交互逻辑
+var isDragging = false, lastX, lastY;
+var canvas = document.getElementById('c');
+canvas.addEventListener('touchstart', function(e){
+    if(e.touches.length === 1){ isDragging=true; lastX=e.touches[0].clientX; lastY=e.touches[0].clientY; }
+});
+canvas.addEventListener('touchmove', function(e){
+    if(!isDragging) return;
+    var dx = e.touches[0].clientX - lastX;
+    var dy = e.touches[0].clientY - lastY;
+    model.x += dx;
+    model.y += dy;
+    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+});
+canvas.addEventListener('touchend', function(){ isDragging=false; });
+
+// JS接口：翻转
+window.kelivoFlip = function(){ flipX *= -1; model.scale.x = Math.abs(model.scale.x) * flipX; };
+// JS接口：缩放
+window.kelivoScale = function(s){ model.scale.set(model.scale.x * s, model.scale.y * s); };
 
 function initPixi(){
   PIXI.live2d.Live2DModel.registerTicker(PIXI.Ticker);
