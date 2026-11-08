@@ -17,6 +17,12 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:uuid/uuid.dart';
+import '../../../core/services/character_card_import.dart';
+import '../../../core/providers/world_book_provider.dart';
+import '../../../core/models/world_book.dart';
+import 'dart:convert' show utf8;
 
 class AssistantSettingsPage extends StatelessWidget {
   const AssistantSettingsPage({super.key});
@@ -415,6 +421,62 @@ Future<String?> _showAddAssistantSheet(BuildContext context) async {
   final l10n = AppLocalizations.of(context)!;
   final controller = TextEditingController();
   String? result;
+  // Character-card import entry (npu16): pick PNG/CHARX/JSON card,
+  // create assistant from it, and route embedded lorebook to WorldBook.
+  Future<void> importCard() async {
+    final picked = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+      withData: true,
+    );
+    if (picked == null || picked.files.single.bytes == null) return;
+    final f = picked.files.single;
+    final import = parseCharacterCardBytes(f.bytes!, f.name);
+    if (!context.mounted) return;
+    if (import == null) {
+      showAppSnackBar(
+        context,
+        message: l10n.assistantEditSystemPromptImportFailed,
+        type: NotificationType.error,
+      );
+      return;
+    }
+    final lorebook = <Map<String, dynamic>>[];
+    final assistantProvider = context.read<AssistantProvider>();
+    final id = await assistantProvider.importFromCharacterCard(
+      import,
+      l10n,
+      lorebookOut: lorebook,
+    );
+    if (id == null) return;
+    if (lorebook.isNotEmpty && context.mounted) {
+      final wb = context.read<WorldBookProvider>();
+      final entries = lorebook
+          .map((e) => WorldBookEntry(
+                id: e['id'] as String? ?? const Uuid().v4(),
+                name: (e['name'] as String?) ?? '',
+                enabled: (e['enabled'] as bool?) ?? true,
+                content: (e['content'] as String?) ?? '',
+                keywords:
+                    (e['keywords'] as List?)?.map((k) => k.toString()).toList() ??
+                        const <String>[],
+                constantActive: (e['constantActive'] as bool?) ?? false,
+              ))
+          .toList();
+      await wb.addBook(WorldBook(
+        id: const Uuid().v4(),
+        name: import.card.name,
+        entries: entries,
+      ));
+    }
+    if (!context.mounted) return;
+    showAppSnackBar(
+      context,
+      message: '${l10n.assistantSettingsAddSheetSave}: ${import.card.name}',
+      type: NotificationType.success,
+    );
+    result = id;
+  }
+
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
@@ -506,6 +568,19 @@ Future<String?> _showAddAssistantSheet(BuildContext context) async {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              // npu16: import from character card (PNG/CHARX/JSON, V2/V3)
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  icon: Icon(Lucide.UserPlus, size: 16, color: cs.primary),
+                  label: Text(
+                    l10n.assistantSettingsAddSheetTitle,
+                    style: TextStyle(fontSize: 13, color: cs.primary),
+                  ),
+                  onPressed: () => importCard(),
+                ),
               ),
             ],
           ),

@@ -11,6 +11,7 @@ import '../models/assistant_copy_options.dart';
 import '../models/assistant_regex.dart';
 import '../models/preset_message.dart';
 import '../services/chat/chat_service.dart';
+import '../services/character_card_import.dart';
 import '../services/assistant_copy_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
@@ -348,6 +349,37 @@ class AssistantProvider extends ChangeNotifier {
     );
     _assistants.add(a);
     await _persist();
+    notifyListeners();
+    return a.id;
+  }
+
+  /// Creates an assistant from a V2/V3 character card.
+  /// Returns the new assistant id. Lorebook entries are returned via
+  /// [lorebookOut] so the caller can route them into WorldBookProvider.
+  Future<String?> importFromCharacterCard(
+    CharacterCardImportResult cardImport,
+    AppLocalizations? l10n, {
+    List<Map<String, dynamic>>? lorebookOut,
+  }) async {
+    final c = cardImport.card;
+    final prompt = characterCardSystemPrompt(c);
+    if (c.name.isEmpty) return null;
+    final preset = <PresetMessage>[];
+    if (c.firstMes.isNotEmpty) {
+      preset.add(PresetMessage(role: 'assistant', content: c.firstMes));
+    }
+    final a = Assistant(
+      id: const Uuid().v4(),
+      name: c.name,
+      systemPrompt: prompt.isEmpty ? 'You are {{char}}.' : prompt,
+      presetMessages: preset,
+      temperature: null,
+      topP: null,
+      limitContextMessages: false,
+    );
+    _assistants.add(a);
+    await _persist();
+    lorebookOut?.addAll(cardImport.lorebookEntries);
     notifyListeners();
     return a.id;
   }
