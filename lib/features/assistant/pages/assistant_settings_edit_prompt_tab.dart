@@ -137,6 +137,70 @@ class _PromptTabState extends State<_PromptTab> {
     }
   }
 
+  /// npu17: import a SillyTavern chat-completion preset JSON and apply it
+  /// to this assistant (system prompt + preset messages + sampling params).
+  Future<void> _importStPreset() async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      final res = await FilePicker.platform.pickFiles(
+        allowMultiple: false,
+        withData: true,
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+      );
+      if (res == null || res.files.isEmpty) return;
+      final picked = res.files.first;
+      String? content;
+      if (picked.bytes != null && picked.bytes!.isNotEmpty) {
+        content = utf8.decode(picked.bytes!, allowMalformed: true);
+      } else if (!kIsWeb && picked.path != null && picked.path!.isNotEmpty) {
+        content = await File(picked.path!).readAsString();
+      }
+      if (!mounted) return;
+      if (content == null || content.trim().isEmpty) {
+        showAppSnackBar(
+          context,
+          message: l10n.assistantEditSystemPromptImportEmpty,
+          type: NotificationType.error,
+        );
+        return;
+      }
+      final r = parseStPresetJson(content);
+      if (r.importedCount == 0) {
+        showAppSnackBar(
+          context,
+          message: l10n.assistantEditSystemPromptImportFailed,
+          type: NotificationType.error,
+        );
+        return;
+      }
+      final ap = context.read<AssistantProvider>();
+      final a = ap.getById(widget.assistantId);
+      if (a == null) return;
+      final updated = applyStPresetToAssistant(a, r);
+      await ap.updateAssistant(updated);
+      if (!mounted) return;
+      setState(() {
+        _sysCtrl.text = updated.systemPrompt;
+        _sysCtrl.selection = TextSelection.collapsed(
+          offset: _sysCtrl.text.length,
+        );
+      });
+      showAppSnackBar(
+        context,
+        message:
+            '${l10n.assistantEditSystemPromptImportSuccess} (${r.importedCount})',
+        type: NotificationType.success,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.assistantEditSystemPromptImportFailed,
+        type: NotificationType.error,
+      );
+    }
+  }
   Future<void> _applySystemPromptChange(String value) async {
     final ap = context.read<AssistantProvider>();
     final a = ap.getById(widget.assistantId);
@@ -669,6 +733,12 @@ class _PromptTabState extends State<_PromptTab> {
                   }
                 });
               },
+            ),
+            _HoverPillButton(
+              icon: Lucide.FilePlus,
+              color: cs.tertiary,
+              label: l10n.assistantEditSystemPromptImportButton,
+              onTap: _importStPreset,
             ),
           ],
         );
