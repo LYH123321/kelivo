@@ -15,6 +15,7 @@ import io.flutter.embedding.android.FlutterView
 import io.flutter.embedding.engine.FlutterEngine
 import com.psyche.kelivo.workspace.WorkspacePlugin
 import io.flutter.plugin.common.MethodChannel
+import com.psyche.kelivo.live2d.Live2dService
 import com.dexterous.flutterlocalnotifications.FlutterLocalNotificationsPlugin
 import java.io.File
 import java.io.FileInputStream
@@ -158,6 +159,53 @@ class MainActivity : FlutterActivity() {
         deviceStorageChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "freeBytes" -> result.success(usableBytesForAppData())
+                else -> result.notImplemented()
+            }
+        }
+        // npu18: Live2D floating pet
+        Live2dService.initContext(this)
+        val live2dChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.live2d")
+        live2dChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "show" -> {
+                    try {
+                        val model = call.argument<String>("model") ?: "models/PurpleBird/PurpleBird.model3.json"
+                        Live2dService.show(this, model)
+                        result.success(Live2dService.isShowing())
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "hide" -> {
+                    Live2dService.hide(this)
+                    result.success(true)
+                }
+                "isShowing" -> result.success(Live2dService.isShowing())
+                "speak" -> {
+                    Live2dService.speak(call.argument<String>("text") ?: "")
+                    result.success(true)
+                }
+                "canDrawOverlays" -> {
+                    val ctx = applicationContext
+                    result.success(
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M)
+                            android.provider.Settings.canDrawOverlays(ctx)
+                        else true
+                    )
+                }
+                "openOverlaySettings" -> {
+                    try {
+                        val i = Intent(
+                            android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        )
+                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(i)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

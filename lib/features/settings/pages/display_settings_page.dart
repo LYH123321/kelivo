@@ -18,6 +18,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/tip_icon.dart';
 import '../../../core/services/haptics.dart';
+import 'live2d_settings_page.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
@@ -115,6 +116,18 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const ChatItemDisplaySettingsPage(),
+                  ),
+                ),
+              ),
+              _iosDivider(context),
+              // npu18: Live2D pet entry
+              _iosNavRow(
+                context,
+                icon: Lucide.Sparkles,
+                label: 'Live2D 桌宠',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const Live2dSettingsPage(),
                   ),
                 ),
               ),

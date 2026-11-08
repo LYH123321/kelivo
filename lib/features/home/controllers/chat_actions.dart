@@ -25,6 +25,7 @@ import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/api/stream/stream_chunk_handler.dart';
 import '../../../core/services/api/tool_call_cancellation.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/live2d_bridge.dart';
 import '../../../core/services/mobile_background.dart';
 import '../../../core/services/logging/flutter_logger.dart';
 import '../../../l10n/app_localizations.dart';
@@ -2910,6 +2911,11 @@ class ChatActions {
 
   /// Handle stream done callback.
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
+    // npu18: lip-sync the Live2D pet with the finished reply (fire & forget).
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      final text = state.fullContentRaw.trim();
+      if (text.isNotEmpty) unawaited(Live2dBridge.speak(text));
+    }
     state.finishRequestTiming();
     final conversationId = state.conversationId;
     final messageId = state.messageId;
