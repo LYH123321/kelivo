@@ -201,8 +201,8 @@ CharacterCardImportResult? parseCharacterCardBytes(
           break;
         }
       }
-      cardFile ??= archive.files.firstWhere(
-        (f) => f.name.toLowerCase().endsWith('.json') && !f.name.contains('/'),
+      cardFile ??= archive.files.cast<ArchiveFile?>().firstWhere(
+        (f) => f != null && f.name.toLowerCase().endsWith('.json') && !f.name.contains('/'),
         orElse: () => null,
       );
       if (cardFile != null && cardFile.name.isNotEmpty) {
