@@ -203,9 +203,9 @@ CharacterCardImportResult? parseCharacterCardBytes(
       }
       cardFile ??= archive.files.firstWhere(
         (f) => f.name.toLowerCase().endsWith('.json') && !f.name.contains('/'),
-        orElse: () => const ArchiveFile('', 0, []),
+        orElse: () => null,
       );
-      if (cardFile.isNotEmpty) {
+      if (cardFile != null && cardFile.name.isNotEmpty) {
         final json = decodeCardJson(utf8.decode(cardFile.content as List<int>));
         if (json != null) return parseCharacterCard(json);
       }

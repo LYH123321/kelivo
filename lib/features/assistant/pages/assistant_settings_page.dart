@@ -574,7 +574,7 @@ Future<String?> _showAddAssistantSheet(BuildContext context) async {
               SizedBox(
                 width: double.infinity,
                 child: TextButton.icon(
-                  icon: Icon(Lucide.UserPlus, size: 16, color: cs.primary),
+                  icon: Icon(Lucide.FilePlus, size: 16, color: cs.primary),
                   label: Text(
                     l10n.assistantSettingsAddSheetTitle,
                     style: TextStyle(fontSize: 13, color: cs.primary),
