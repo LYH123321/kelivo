@@ -376,6 +376,7 @@ class AssistantProvider extends ChangeNotifier {
       temperature: null,
       topP: null,
       limitContextMessages: false,
+      regexRules: c.regexRules,
     );
     _assistants.add(a);
     await _persist();

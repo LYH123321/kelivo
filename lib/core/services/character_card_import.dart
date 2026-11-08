@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
-
 import 'package:archive/archive.dart';
 import 'package:uuid/uuid.dart';
+import '../models/assistant_regex.dart';
 
 /// Character card (V2/V3) importer for Kelivo.
 ///
@@ -23,8 +23,8 @@ class CharacterCardData {
   final String creatorNotes;
   final List<String> alternateGreetings;
   final String avatarPath; // extracted image (png card cover), may be ''
+  final List<AssistantRegex> regexRules;
   final Map<String, dynamic> raw;
-
   const CharacterCardData({
     required this.name,
     this.description = '',
@@ -36,6 +36,7 @@ class CharacterCardData {
     this.creatorNotes = '',
     this.alternateGreetings = const <String>[],
     this.avatarPath = '',
+    this.regexRules = const <AssistantRegex>[],
     this.raw = const <String, dynamic>{},
   });
 }
@@ -110,6 +111,49 @@ Map<String, dynamic> cardDataMap(Map<String, dynamic> card) {
   return card;
 }
 
+
+List<AssistantRegex> _parseRegexRules(Map<String, dynamic> data) {
+  final extensions = data['extensions'] is Map ? (data['extensions'] as Map).cast<String, dynamic>() : const <String, dynamic>{};
+  final scripts = data['regex_scripts'] ?? data['regex_rules'] ?? extensions['regex_scripts'] ?? extensions['regex_rules'];
+  if (scripts is! List) return const <AssistantRegex>[];
+
+  final rules = <AssistantRegex>[];
+  for (final item in scripts) {
+    if (item is! Map) continue;
+    final m = item.cast<String, dynamic>();
+    final scriptName = (m['scriptName'] ?? m['name'] ?? '').toString();
+    final findRegex = (m['findRegex'] ?? m['pattern'] ?? '').toString();
+    if (findRegex.isEmpty) continue;
+    final replaceString = (m['replaceString'] ?? m['replacement'] ?? '').toString();
+    final disabled = m['disabled'] == true;
+    final enabled = m.containsKey('enabled') ? (m['enabled'] == true) : (!disabled);
+
+    final rawPlacement = m['placement'];
+    final scopes = <AssistantRegexScope>[];
+    if (rawPlacement is List) {
+      for (final p in rawPlacement) {
+        if (p == 1 || p == '1' || p == 'user') scopes.add(AssistantRegexScope.user);
+        if (p == 2 || p == '2' || p == 'assistant') scopes.add(AssistantRegexScope.assistant);
+      }
+    }
+    if (scopes.isEmpty) {
+      scopes.addAll([AssistantRegexScope.user, AssistantRegexScope.assistant]);
+    }
+
+    rules.add(AssistantRegex(
+      id: (m['id'] ?? const Uuid().v4()).toString(),
+      name: scriptName.isEmpty ? 'Regex' : scriptName,
+      pattern: findRegex,
+      replacement: replaceString,
+      scopes: scopes,
+      visualOnly: false,
+      replaceOnly: false,
+      enabled: enabled,
+    ));
+  }
+  return rules;
+}
+
 CharacterCardImportResult? parseCharacterCard(
   Map<String, dynamic> card, {
   String avatarPath = '',
@@ -167,6 +211,7 @@ CharacterCardImportResult? parseCharacterCard(
       ? (data['alternate_greetings'] as List).map((g) => g.toString()).toList()
       : <String>[];
 
+  final regexRules = _parseRegexRules(data);
   final card2 = CharacterCardData(
     name: name,
     description: s(data['description']),
@@ -178,6 +223,7 @@ CharacterCardImportResult? parseCharacterCard(
     creatorNotes: s(data['creator_notes']),
     alternateGreetings: altGreetings,
     avatarPath: avatarPath,
+    regexRules: regexRules,
     raw: card,
   );
   return CharacterCardImportResult(card: card2, lorebookEntries: entries);
