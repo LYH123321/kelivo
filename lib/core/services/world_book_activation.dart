@@ -1,3 +1,4 @@
+import 'vector_math.dart';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -14,6 +15,8 @@ class WorldBookActivation {
     required List<Map<String, dynamic>> scanMessages,
     required List<Map<String, dynamic>> history,
     Map<String, dynamic> previous = const {},
+    List<double>? queryEmbedding,
+    double similarityThreshold = 0.65,
   }) {
     String fingerprint(Object value) =>
         sha256.convert(utf8.encode(jsonEncode(value))).toString();
@@ -72,6 +75,15 @@ class WorldBookActivation {
         if (!active) {
           if (count < entry.delay) continue;
           active = matches(entry, contextFor(entry.scanDepth.clamp(1, 200)));
+          
+          // Vector / Semantic RAG Matching fallback
+          if (!active && queryEmbedding != null && queryEmbedding.isNotEmpty && entry.embedding.isNotEmpty) {
+            final sim = VectorMath.cosineSimilarity(queryEmbedding, entry.embedding);
+            if (sim >= similarityThreshold) {
+              active = true;
+            }
+          }
+
           if (active && (entry.sticky > 0 || entry.cooldown > 0)) {
             effects[key] = {'signature': signature, 'activatedAt': count};
           }

@@ -74,6 +74,7 @@ class WorldBookEntry {
   final int sticky;
   final int cooldown;
   final int delay;
+  final List<double> embedding;
 
   const WorldBookEntry({
     required this.id,
@@ -92,6 +93,7 @@ class WorldBookEntry {
     this.sticky = 0,
     this.cooldown = 0,
     this.delay = 0,
+    this.embedding = const <double>[],
   });
 
   WorldBookEntry copyWith({
@@ -129,6 +131,7 @@ class WorldBookEntry {
       sticky: sticky ?? this.sticky,
       cooldown: cooldown ?? this.cooldown,
       delay: delay ?? this.delay,
+      embedding: embedding ?? this.embedding,
     );
   }
 
@@ -149,6 +152,7 @@ class WorldBookEntry {
     'sticky': sticky,
     'cooldown': cooldown,
     'delay': delay,
+    'embedding': embedding,
   };
 
   static WorldBookEntry fromJson(Map<String, dynamic> json) {
