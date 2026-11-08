@@ -2912,10 +2912,10 @@ class ChatActions {
   /// Handle stream done callback.
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
     // npu18: lip-sync the Live2D pet with the finished reply (fire & forget).
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      final text = state.fullContentRaw.trim();
-      if (text.isNotEmpty) unawaited(Live2dBridge.speak(text));
-    }
+    // The bridge swallows MissingPluginException, so calling on non-Android
+    // platforms is a safe no-op.
+    final text = state.fullContentRaw.trim();
+    if (text.isNotEmpty) unawaited(Live2dBridge.speak(text));
     state.finishRequestTiming();
     final conversationId = state.conversationId;
     final messageId = state.messageId;
