@@ -41,10 +41,6 @@ const List<String> _kSkipIdentifiers = [
   'personaDescription',
   'worldInfoBefore',
   'worldInfoAfter',
-  'enhanceDefinitions',
-  'nsfw',
-  'jailbreak',
-  'main',
 ];
 
 /// Parse a SillyTavern chat-completion preset JSON string.
