@@ -30,7 +30,7 @@ class ClawHubMarketSheet extends StatefulWidget {
         expand: false,
         initialChildSize: 0.9,
         minChildSize: 0.5,
-        builder: (_, __, ___) => const ClawHubMarketSheet(),
+        builder: (_, __) => const ClawHubMarketSheet(),
       ),
     );
   }
