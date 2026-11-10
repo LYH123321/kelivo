@@ -26,7 +26,7 @@ class ClawHubMarketSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => const DraggableScrollableSheet(
+      builder: (_) => DraggableScrollableSheet(
         expand: false,
         initialChildSize: 0.9,
         minChildSize: 0.5,
