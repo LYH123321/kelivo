@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:Kelivo/core/services/haptics.dart';
 import 'package:Kelivo/core/services/skills/skills_service.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/clawhub_market_sheet.dart';
+import 'package:Kelivo/features/workspace/widgets/skills/custom_import.dart';
 import 'package:Kelivo/desktop/menu_anchor.dart';
 import 'package:Kelivo/features/settings/widgets/custom_theme_widgets.dart';
 import 'package:Kelivo/features/workspace/widgets/skills/skill_labels.dart';
@@ -22,7 +23,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-enum SkillImportKind { paste, file, github, clawhub }
+enum SkillImportKind { paste, file, github, clawhub, custom }
 
 Future<void> startSkillImport(
   BuildContext context, {
@@ -43,6 +44,8 @@ Future<void> runSkillImport(BuildContext context, SkillImportKind kind) async {
       await showSkillGitHubImport(context);
     case SkillImportKind.clawhub:
       await ClawHubMarketSheet.show(context);
+    case SkillImportKind.custom:
+      await runCustomImport(context);
   }
 }
 
@@ -83,6 +86,11 @@ Future<SkillImportKind?> showSkillImportMenu(
         icon: Lucide.Compass,
         label: 'ClawHub 插件市场',
         onTap: () => selected = SkillImportKind.clawhub,
+      ),
+      ActionSheetItem(
+        icon: Lucide.Import,
+        label: '自定义导入（技能/插件）',
+        onTap: () => selected = SkillImportKind.custom,
       ),
     ],
   );
