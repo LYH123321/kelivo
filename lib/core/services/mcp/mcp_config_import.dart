@@ -16,6 +16,8 @@ List<McpServerConfig> parseMcpConfigImport(String text) {
   final result = <McpServerConfig>[];
   for (final entry in raw.entries) {
     final name = entry.key.toString();
+    // Metadata keys like "$schema" are not servers.
+    if (name.startsWith(r'$')) continue;
     final config = entry.value;
     if (config is! Map) throw FormatException('Invalid server: $name');
     final type = (config['type'] ?? '').toString().toLowerCase();

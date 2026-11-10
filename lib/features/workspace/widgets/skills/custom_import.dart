@@ -54,7 +54,9 @@ Future<void> runCustomImport(BuildContext context) async {
         );
       case CustomImportKind.unknown:
         throw const FormatException(
-          'Unrecognized file: zip must contain SKILL.md or a JSON with mcpServers',
+          'Unrecognized file: need SKILL.md (skill zip) or JSON with '
+          'mcpServers (command/url entries). Note: JS-host plugin '
+          'manifests (dsh-plugin.json etc.) cannot run in this app',
         );
     }
   } catch (e) {
@@ -89,7 +91,13 @@ bool _jsonHasServers(String text) {
     final decoded = jsonDecode(text);
     if (decoded is! Map) return false;
     final raw = decoded['mcpServers'] ?? decoded;
-    return raw is Map && raw.isNotEmpty;
+    if (raw is! Map || raw.isEmpty) return false;
+    // Require at least one entry shaped like a real MCP server
+    // (command for stdio, url for http/sse). Metadata keys such as
+    // $schema/manifestVersion do not count.
+    return raw.values.any(
+      (v) => v is Map && (v['command'] != null || v['url'] != null),
+    );
   } catch (_) {
     return false;
   }
