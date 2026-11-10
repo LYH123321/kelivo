@@ -69,7 +69,10 @@ class _ClawHubMarketSheetState extends State<ClawHubMarketSheet> {
       _error = null;
     });
     try {
-      final results = await _client.search(query ?? _controller.text.trim());
+      final q = (query ?? _controller.text.trim()).toLowerCase();
+    final results = q.isEmpty
+        ? await _client.browseSkills()
+        : await _client.search(q);
       if (!mounted) return;
       setState(() {
         _results = results;

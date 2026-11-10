@@ -27,7 +27,43 @@ class ClawHubClient {
   ClawHubClient({http.Client? client}) : _client = client ?? http.Client();
   final http.Client _client;
 
-  static const _base = 'https://clawhub.com/api/v1';
+  static const _base = 'https://clawhub.ai/api/v1';
+
+  /// Browse trending skills from the registry index (marketplace home).
+  /// NOTE: clawhub.com 307-redirects to clawhub.ai and the empty-query
+  /// /search returns no results there, so the home list uses /skills.
+  Future<List<ClawHubPackage>> browseSkills({int limit = 40}) async {
+    final uri = Uri.parse('$_base/skills?limit=$limit');
+    final resp = await _client
+        .get(uri, headers: const {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 20));
+    if (resp.statusCode != 200) {
+      throw Exception('ClawHub browse failed: HTTP ${resp.statusCode}');
+    }
+    final decoded = jsonDecode(utf8.decode(resp.bodyBytes));
+    final items = decoded is Map ? decoded['items'] : decoded;
+    if (items is! List) return const [];
+    final out = <ClawHubPackage>[];
+    for (final item in items) {
+      if (item is! Map) continue;
+      final slug = (item['slug'] ?? '').toString();
+      final owner = (item['ownerHandle'] ?? '').toString();
+      if (slug.isEmpty || owner.isEmpty) continue;
+      final stats = item['stats'];
+      out.add(
+        ClawHubPackage(
+          name: slug,
+          ownerHandle: owner,
+          summary: (item['summary'] ?? '').toString(),
+          downloads: stats is Map && stats['downloads'] is num
+              ? (stats['downloads'] as num).toInt()
+              : 0,
+          featured: false,
+        ),
+      );
+    }
+    return out;
+  }
 
   Future<List<ClawHubPackage>> search(
     String query, {
