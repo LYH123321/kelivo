@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/models/world_book.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../../core/services/character_card_import.dart';
 import '../../../core/services/haptics.dart';
 import '../utils/world_book_import.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -109,7 +110,7 @@ class _WorldBookPageState extends State<WorldBookPage> {
       result = await FilePicker.platform.pickFiles(
         allowMultiple: false,
         type: FileType.custom,
-        allowedExtensions: const ['json'],
+        allowedExtensions: const ['json', 'png', 'charx'],
         withData: true,
       );
     } catch (_) {
@@ -118,6 +119,70 @@ class _WorldBookPageState extends State<WorldBookPage> {
 
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
+
+    // Handle PNG / CHARX card image import (extract character_book)
+    final lowerName = file.name.toLowerCase();
+    if (lowerName.endsWith('.png') || lowerName.endsWith('.charx')) {
+      Uint8List? bytes = file.bytes;
+      if ((bytes == null || bytes.isEmpty) && file.path != null && file.path!.isNotEmpty) {
+        try {
+          bytes = await File(file.path!).readAsBytes();
+        } catch (_) {}
+      }
+      if (bytes != null && bytes.isNotEmpty) {
+        final cardResult = parseCharacterCardBytes(bytes, file.name);
+        if (cardResult != null && cardResult.lorebookEntries.isNotEmpty) {
+          final entriesList = cardResult.lorebookEntries.map((e) {
+            final keys = (e['keywords'] as List?)?.map((k) => k.toString()).toList() ?? const <String>[];
+            final posRaw = (e['position'] ?? '').toString().toLowerCase();
+            final pos = posRaw.contains('before')
+                ? WorldBookInjectionPosition.beforeSystemPrompt
+                : posRaw.contains('depth')
+                    ? WorldBookInjectionPosition.atDepth
+                    : WorldBookInjectionPosition.afterSystemPrompt;
+            return WorldBookEntry(
+              id: (e['id'] ?? const Uuid().v4()).toString(),
+              name: (e['name'] ?? '').toString(),
+              enabled: (e['enabled'] as bool?) ?? true,
+              content: (e['content'] ?? '').toString(),
+              keywords: keys,
+              constantActive: (e['constantActive'] as bool?) ?? false,
+              position: pos,
+            );
+          }).toList();
+          final bookName = cardResult.card.name.trim().isNotEmpty
+              ? cardResult.card.name.trim()
+              : file.name.replaceFirst(RegExp(r'\.(png|charx)$', caseSensitive: false), '');
+          final book = WorldBook(
+            id: const Uuid().v4(),
+            name: bookName,
+            description: cardResult.card.description,
+            entries: entriesList,
+          );
+          final normalized = normalizeImportedWorldBook(
+            book,
+            existingBookIds: provider.books.map((e) => e.id).toSet(),
+          );
+          await provider.addBook(normalized);
+          if (mounted) {
+            showAppSnackBar(
+              context,
+              message: '${l10n.assistantSettingsAddSheetSave}: $bookName (${entriesList.length})',
+              type: NotificationType.success,
+            );
+          }
+          return;
+        } else {
+          showAppSnackBar(
+            context,
+            message: '该角色卡中未检测到内嵌世界书 (character_book)',
+            type: NotificationType.warning,
+          );
+          return;
+        }
+      }
+    }
+
     final content = await _readPickedFileAsString(file);
     if (!mounted) return;
     if (content == null || content.trim().isEmpty) {

@@ -1,6 +1,6 @@
 import 'package:uuid/uuid.dart';
-
 import '../../../core/models/world_book.dart';
+import '../../../core/services/character_card_import.dart';
 
 class WorldBookImportResult {
   const WorldBookImportResult(this.book, {this.unsupportedEntryCount = 0});
@@ -22,10 +22,90 @@ WorldBookImportResult? parseWorldBookImport(
     if (json['data'] is Map) {
       json = (json['data'] as Map).cast<String, dynamic>();
     }
+    // Character Card (V2/V3) with embedded character_book
+    if (json.containsKey('character_book') ||
+        (json['data'] is Map && (json['data'] as Map).containsKey('character_book')) ||
+        json['spec'] == 'chara_card_v2' ||
+        json['spec'] == 'chara_card_v3') {
+      final cardResult = parseCharacterCard(json);
+      if (cardResult != null && cardResult.lorebookEntries.isNotEmpty) {
+        final entriesList = cardResult.lorebookEntries.map((e) {
+          final keys = (e['keywords'] as List?)?.map((k) => k.toString()).toList() ?? const <String>[];
+          final posRaw = (e['position'] ?? '').toString().toLowerCase();
+          final pos = posRaw.contains('before')
+              ? WorldBookInjectionPosition.beforeSystemPrompt
+              : posRaw.contains('depth')
+                  ? WorldBookInjectionPosition.atDepth
+                  : WorldBookInjectionPosition.afterSystemPrompt;
+          return WorldBookEntry(
+            id: (e['id'] ?? const Uuid().v4()).toString(),
+            name: (e['name'] ?? '').toString(),
+            enabled: (e['enabled'] as bool?) ?? true,
+            content: (e['content'] ?? '').toString(),
+            keywords: keys,
+            constantActive: (e['constantActive'] as bool?) ?? false,
+            position: pos,
+          );
+        }).toList();
+        final bookName = cardResult.card.name.trim().isNotEmpty
+            ? cardResult.card.name.trim()
+            : fileName.replaceAll('\\', '/').split('/').last.replaceFirst(RegExp(r'\.json$', caseSensitive: false), '');
+        return WorldBookImportResult(
+          WorldBook(
+            id: '',
+            name: bookName,
+            description: cardResult.card.description,
+            entries: entriesList,
+          ),
+        );
+      }
+    }
+
     final entries = json['entries'];
     if (entries is List) {
       if (entries.any((entry) => entry is! Map)) return null;
-      return WorldBookImportResult(WorldBook.fromJson(json));
+      // Try standard Kelivo format first
+      try {
+        return WorldBookImportResult(WorldBook.fromJson(json));
+      } catch (_) {
+        // Fallback: CCv3/Risu format entries list
+        final list = entries.cast<Map>();
+        final imported = <WorldBookEntry>[];
+        for (var i = 0; i < list.length; i++) {
+          final m = list[i].cast<String, dynamic>();
+          final rawKeys = m['keys'] ?? m['key'] ?? m['keywords'];
+          final keys = (rawKeys is List)
+              ? rawKeys.map((k) => k.toString().trim()).where((k) => k.isNotEmpty).toList()
+              : const <String>[];
+          final name = (m['comment'] ?? m['name'] ?? (keys.isNotEmpty ? keys.first : 'entry_$i')).toString();
+          final posRaw = (m['position'] ?? '').toString().toLowerCase();
+          final pos = posRaw.contains('before')
+              ? WorldBookInjectionPosition.beforeSystemPrompt
+              : posRaw.contains('depth')
+                  ? WorldBookInjectionPosition.atDepth
+                  : WorldBookInjectionPosition.afterSystemPrompt;
+          imported.add(WorldBookEntry(
+            id: (m['id'] ?? const Uuid().v4()).toString(),
+            name: name,
+            enabled: (m['enabled'] as bool?) ?? true,
+            priority: -((m['insertion_order'] ?? m['order'] ?? 100) as num).toInt(),
+            position: pos,
+            content: (m['content'] ?? '').toString(),
+            keywords: keys,
+            constantActive: (m['constant'] ?? m['constantActive'] ?? false) == true,
+            useRegex: (m['use_regex'] ?? m['useRegex'] ?? false) == true,
+          ));
+        }
+        final name = (json['name'] ?? '').toString().trim();
+        return WorldBookImportResult(
+          WorldBook(
+            id: '',
+            name: name.isNotEmpty ? name : fileName.replaceAll('\\', '/').split('/').last.replaceFirst(RegExp(r'\.json$', caseSensitive: false), ''),
+            description: (json['description'] ?? '').toString(),
+            entries: imported,
+          ),
+        );
+      }
     }
     if (entries is! Map) return null;
 
