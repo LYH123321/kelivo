@@ -183,6 +183,9 @@ class WorldBookEntrySelectionBar extends StatelessWidget {
     required this.onCancel,
     required this.onCopy,
     required this.onMove,
+    this.onEnable,
+    this.onDisable,
+    this.onToggleConstant,
     this.busy = false,
   });
 
@@ -193,6 +196,9 @@ class WorldBookEntrySelectionBar extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onCopy;
   final VoidCallback onMove;
+  final VoidCallback? onEnable;
+  final VoidCallback? onDisable;
+  final VoidCallback? onToggleConstant;
 
   @override
   Widget build(BuildContext context) {
@@ -264,6 +270,27 @@ class WorldBookEntrySelectionBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
+              if (onEnable != null)
+                action(
+                  name: 'enable',
+                  label: '启用',
+                  icon: Lucide.CheckCircle2,
+                  onPressed: busy || selectedCount == 0 ? null : onEnable,
+                ),
+              if (onDisable != null)
+                action(
+                  name: 'disable',
+                  label: '停用',
+                  icon: Lucide.XCircle,
+                  onPressed: busy || selectedCount == 0 ? null : onDisable,
+                ),
+              if (onToggleConstant != null)
+                action(
+                  name: 'constant',
+                  label: '切换常驻',
+                  icon: Lucide.Pin,
+                  onPressed: busy || selectedCount == 0 ? null : onToggleConstant,
+                ),
               action(
                 name: 'copy',
                 label: l10n.worldBookCopyEntries,

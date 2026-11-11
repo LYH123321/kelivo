@@ -105,29 +105,82 @@ class WorldBookActivation {
     );
   }
 
+  static bool _keywordMatches(
+    String keyword,
+    String context, {
+    required bool useRegex,
+    required bool caseSensitive,
+  }) {
+    final trimmed = keyword.trim();
+    if (trimmed.isEmpty) return false;
+    if (useRegex) {
+      try {
+        return RegExp(
+          trimmed,
+          caseSensitive: caseSensitive,
+        ).hasMatch(context);
+      } on FormatException {
+        return false;
+      }
+    } else {
+      return caseSensitive
+          ? context.contains(trimmed)
+          : context.toLowerCase().contains(trimmed.toLowerCase());
+    }
+  }
+
   static bool matches(WorldBookEntry entry, String context) {
     if (!entry.enabled) return false;
     if (entry.constantActive) return true;
-    for (final raw in entry.keywords) {
-      final keyword = raw.trim();
-      if (keyword.isEmpty) continue;
-      if (entry.useRegex) {
-        try {
-          if (RegExp(
-            keyword,
-            caseSensitive: entry.caseSensitive,
-          ).hasMatch(context)) {
-            return true;
-          }
-        } on FormatException {
-          // One invalid expression must not suppress the other keywords.
-        }
-      } else if (entry.caseSensitive
-          ? context.contains(keyword)
-          : context.toLowerCase().contains(keyword.toLowerCase())) {
-        return true;
-      }
+
+    final hasPrimary = entry.keywords.any((k) => k.trim().isNotEmpty);
+    if (!hasPrimary) return false;
+
+    // Check primary keys match
+    final primaryMatches = entry.keywords.any(
+      (k) => _keywordMatches(
+        k,
+        context,
+        useRegex: entry.useRegex,
+        caseSensitive: entry.caseSensitive,
+      ),
+    );
+
+    if (!primaryMatches) return false;
+
+    // Filter secondary keys
+    final secondary = entry.secondaryKeywords
+        .map((k) => k.trim())
+        .where((k) => k.isNotEmpty)
+        .toList(growable: false);
+
+    // If no secondary keys, primary match is sufficient
+    if (secondary.isEmpty) return true;
+
+    // SillyTavern selectiveLogic:
+    // 0: AND_ANY - Must match at least one secondary key
+    // 1: NOT_ALL - Must NOT match all secondary keys
+    // 2: NOT_ANY - Must NOT match any secondary key
+    // 3: AND_ALL - Must match all secondary keys
+    final matchedCount = secondary.where(
+      (k) => _keywordMatches(
+        k,
+        context,
+        useRegex: entry.useRegex,
+        caseSensitive: entry.caseSensitive,
+      ),
+    ).length;
+
+    switch (entry.selectiveLogic) {
+      case 1: // NOT_ALL
+        return matchedCount < secondary.length;
+      case 2: // NOT_ANY
+        return matchedCount == 0;
+      case 3: // AND_ALL
+        return matchedCount == secondary.length;
+      case 0: // AND_ANY
+      default:
+        return matchedCount > 0;
     }
-    return false;
   }
 }

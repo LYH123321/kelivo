@@ -937,6 +937,19 @@ class _WorldBookSectionState extends State<_WorldBookSection> {
                 _selectedIds.addAll(entries.map((entry) => entry.id));
               }
             }),
+            onEnable: () async {
+              final provider = context.read<WorldBookProvider>();
+              await provider.batchSetEntriesEnabled(book.id, selectedIds, true);
+            },
+            onDisable: () async {
+              final provider = context.read<WorldBookProvider>();
+              await provider.batchSetEntriesEnabled(book.id, selectedIds, false);
+            },
+            onToggleConstant: () async {
+              final provider = context.read<WorldBookProvider>();
+              final anyConstant = entries.where((e) => selectedIds.contains(e.id)).any((e) => e.constantActive);
+              await provider.batchSetEntriesConstant(book.id, selectedIds, !anyConstant);
+            },
             onCopy: () => _transfer(copy: true, ids: selectedIds),
             onMove: () => _transfer(copy: false, ids: selectedIds),
           ),
@@ -973,7 +986,11 @@ class _WorldBookSectionState extends State<_WorldBookSection> {
                 : entry.name.trim();
             final detail = !entry.enabled
                 ? l10n.worldBookDisabledTag
-                : (entry.constantActive ? l10n.worldBookAlwaysOnTag : null);
+                : (entry.constantActive
+                    ? l10n.worldBookAlwaysOnTag
+                    : (entry.keywords.isNotEmpty
+                        ? '\${entry.keywords.length} 触发词'
+                        : (entry.embedding.isNotEmpty ? 'RAG' : '未配置')));
             final canReorder = entries.length > 1;
 
             final row = _IosEntryRow(

@@ -897,7 +897,11 @@ class _EntryRowState extends State<_EntryRow> {
 
     final detail = !widget.entry.enabled
         ? l10n.worldBookDisabledTag
-        : (widget.entry.constantActive ? l10n.worldBookAlwaysOnTag : null);
+        : (widget.entry.constantActive
+            ? l10n.worldBookAlwaysOnTag
+            : (widget.entry.keywords.isNotEmpty
+                ? '${widget.entry.keywords.length} 触发词'
+                : (widget.entry.embedding.isNotEmpty ? 'RAG' : '未配置')));
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

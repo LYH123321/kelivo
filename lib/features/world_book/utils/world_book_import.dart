@@ -84,6 +84,11 @@ WorldBookImportResult? parseWorldBookImport(
               : posRaw.contains('depth')
                   ? WorldBookInjectionPosition.atDepth
                   : WorldBookInjectionPosition.afterSystemPrompt;
+          final rawSecondary = m['secondary_keys'] ?? m['keysecondary'] ?? m['secondaryKeywords'];
+          final secKeys = (rawSecondary is List)
+              ? rawSecondary.map((k) => k.toString().trim()).where((k) => k.isNotEmpty).toList(growable: false)
+              : const <String>[];
+          final selectiveLogic = (m['selectiveLogic'] as num?)?.toInt() ?? 0;
           imported.add(WorldBookEntry(
             id: (m['id'] ?? const Uuid().v4()).toString(),
             name: name,
@@ -92,6 +97,8 @@ WorldBookImportResult? parseWorldBookImport(
             position: pos,
             content: (m['content'] ?? '').toString(),
             keywords: keys,
+            secondaryKeywords: secKeys,
+            selectiveLogic: selectiveLogic,
             constantActive: (m['constant'] ?? m['constantActive'] ?? false) == true,
             useRegex: (m['use_regex'] ?? m['useRegex'] ?? false) == true,
           ));
@@ -170,6 +177,11 @@ WorldBookImportResult? parseWorldBookImport(
           _hasUnsupportedRules(entry, constant: constant);
       if (unsupported) unsupportedEntryCount++;
       final comment = entry['comment'] as String? ?? '';
+      final rawSecondary = entry['keysecondary'] ?? entry['secondary_keys'];
+      final secondaryKeys = (rawSecondary is List)
+          ? rawSecondary.map((k) => k.toString().trim()).where((k) => k.isNotEmpty).toList(growable: false)
+          : const <String>[];
+      final selectiveLogic = entry['selectiveLogic'] as int? ?? 0;
       final converted = WorldBookEntry(
         id: (entry['uid'] ?? key).toString(),
         name: comment.isNotEmpty ? comment : keys.firstOrNull ?? '',
@@ -187,6 +199,8 @@ WorldBookImportResult? parseWorldBookImport(
             ? WorldBookInjectionRole.assistant
             : WorldBookInjectionRole.user,
         keywords: keys,
+        secondaryKeywords: secondaryKeys,
+        selectiveLogic: selectiveLogic,
         caseSensitive: entry['caseSensitive'] as bool? ?? false,
         scanDepth: scanDepth.clamp(1, 200),
         constantActive: constant,
@@ -249,11 +263,7 @@ bool _hasUnsupportedRules(
       (entry['delay'] as int? ?? 0) > 10000) {
     return true;
   }
-  if (!constant &&
-      (entry['selective'] as bool? ?? true) &&
-      ((entry['keysecondary'] as List?)?.isNotEmpty ?? false)) {
-    return true;
-  }
+  // Secondary keys (keysecondary) are fully supported now.
   if ((entry['useProbability'] as bool? ?? true) &&
       (entry['probability'] as num? ?? 100) != 100) {
     return true;

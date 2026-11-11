@@ -144,6 +144,48 @@ class WorldBookProvider with ChangeNotifier {
         await _store.save(_books);
       });
 
+  Future<void> batchSetEntriesEnabled(
+    String bookId,
+    Set<String> entryIds,
+    bool enabled,
+  ) => _serializeBookOperation(() async {
+    final index = _books.indexWhere((b) => b.id == bookId);
+    if (index < 0) return;
+    final book = _books[index];
+    final next = book.copyWith(
+      entries: [
+        for (final entry in book.entries)
+          entryIds.contains(entry.id)
+              ? entry.copyWith(enabled: enabled)
+              : entry,
+      ],
+    );
+    _books = List<WorldBook>.from(_books)..[index] = next;
+    notifyListeners();
+    await _store.save(_books);
+  });
+
+  Future<void> batchSetEntriesConstant(
+    String bookId,
+    Set<String> entryIds,
+    bool constantActive,
+  ) => _serializeBookOperation(() async {
+    final index = _books.indexWhere((b) => b.id == bookId);
+    if (index < 0) return;
+    final book = _books[index];
+    final next = book.copyWith(
+      entries: [
+        for (final entry in book.entries)
+          entryIds.contains(entry.id)
+              ? entry.copyWith(constantActive: constantActive)
+              : entry,
+      ],
+    );
+    _books = List<WorldBook>.from(_books)..[index] = next;
+    notifyListeners();
+    await _store.save(_books);
+  });
+
   Future<void> clear() => _serializeBookOperation(() async {
     await _store.clear();
     _books = const <WorldBook>[];

@@ -67,6 +67,8 @@ class WorldBookEntry {
   final int injectDepth;
   final WorldBookInjectionRole role;
   final List<String> keywords;
+  final List<String> secondaryKeywords;
+  final int selectiveLogic;
   final bool useRegex;
   final bool caseSensitive;
   final int scanDepth;
@@ -86,6 +88,8 @@ class WorldBookEntry {
     this.injectDepth = 4,
     this.role = WorldBookInjectionRole.user,
     this.keywords = const <String>[],
+    this.secondaryKeywords = const <String>[],
+    this.selectiveLogic = 0,
     this.useRegex = false,
     this.caseSensitive = false,
     this.scanDepth = 4,
@@ -106,6 +110,8 @@ class WorldBookEntry {
     int? injectDepth,
     WorldBookInjectionRole? role,
     List<String>? keywords,
+    List<String>? secondaryKeywords,
+    int? selectiveLogic,
     bool? useRegex,
     bool? caseSensitive,
     int? scanDepth,
@@ -113,6 +119,7 @@ class WorldBookEntry {
     int? sticky,
     int? cooldown,
     int? delay,
+    List<double>? embedding,
   }) {
     return WorldBookEntry(
       id: id ?? this.id,
@@ -124,6 +131,8 @@ class WorldBookEntry {
       injectDepth: injectDepth ?? this.injectDepth,
       role: role ?? this.role,
       keywords: keywords ?? this.keywords,
+      secondaryKeywords: secondaryKeywords ?? this.secondaryKeywords,
+      selectiveLogic: selectiveLogic ?? this.selectiveLogic,
       useRegex: useRegex ?? this.useRegex,
       caseSensitive: caseSensitive ?? this.caseSensitive,
       scanDepth: scanDepth ?? this.scanDepth,
@@ -136,33 +145,49 @@ class WorldBookEntry {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'enabled': enabled,
-    'priority': priority,
-    'position': position.toJson(),
-    'content': content,
-    'injectDepth': injectDepth,
-    'role': role.toJson(),
-    'keywords': keywords,
-    'useRegex': useRegex,
-    'caseSensitive': caseSensitive,
-    'scanDepth': scanDepth,
-    'constantActive': constantActive,
-    'sticky': sticky,
-    'cooldown': cooldown,
-    'delay': delay,
-    'embedding': embedding,
+    id: id,
+    name: name,
+    enabled: enabled,
+    priority: priority,
+    position: position.toJson(),
+    content: content,
+    injectDepth: injectDepth,
+    role: role.toJson(),
+    keywords: keywords,
+    secondaryKeywords: secondaryKeywords,
+    selectiveLogic: selectiveLogic,
+    useRegex: useRegex,
+    caseSensitive: caseSensitive,
+    scanDepth: scanDepth,
+    constantActive: constantActive,
+    sticky: sticky,
+    cooldown: cooldown,
+    delay: delay,
+    embedding: embedding,
   };
 
   static WorldBookEntry fromJson(Map<String, dynamic> json) {
-    final rawKeywords = json['keywords'];
+    final rawKeywords = json['keywords'] ?? json['key'] ?? json['keys'];
     final keywords = (rawKeywords is List)
         ? rawKeywords
               .map((e) => e.toString().trim())
               .where((e) => e.isNotEmpty)
               .toList(growable: false)
         : const <String>[];
+    final rawSecondary = json['secondaryKeywords'] ?? json['keysecondary'] ?? json['secondary_keys'];
+    final secondaryKeywords = (rawSecondary is List)
+        ? rawSecondary
+              .map((e) => e.toString().trim())
+              .where((e) => e.isNotEmpty)
+              .toList(growable: false)
+        : const <String>[];
+    final rawEmbedding = json['embedding'];
+    final embedding = (rawEmbedding is List)
+        ? rawEmbedding
+              .whereType<num>()
+              .map((e) => e.toDouble())
+              .toList(growable: false)
+        : const <double>[];
     return WorldBookEntry(
       id: (json['id'] as String?) ?? '',
       name: (json['name'] as String?) ?? '',
@@ -173,6 +198,8 @@ class WorldBookEntry {
       injectDepth: (json['injectDepth'] as int?) ?? 4,
       role: WorldBookInjectionRoleJson.fromJson(json['role']),
       keywords: keywords,
+      secondaryKeywords: secondaryKeywords,
+      selectiveLogic: (json['selectiveLogic'] as int?) ?? 0,
       useRegex: (json['useRegex'] as bool?) ?? false,
       caseSensitive: (json['caseSensitive'] as bool?) ?? false,
       scanDepth: (json['scanDepth'] as int?) ?? 4,
@@ -180,6 +207,7 @@ class WorldBookEntry {
       sticky: ((json['sticky'] as int?) ?? 0).clamp(0, 10000),
       cooldown: ((json['cooldown'] as int?) ?? 0).clamp(0, 10000),
       delay: ((json['delay'] as int?) ?? 0).clamp(0, 10000),
+      embedding: embedding,
     );
   }
 }
