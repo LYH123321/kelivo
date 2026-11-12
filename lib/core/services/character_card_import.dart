@@ -192,12 +192,22 @@ CharacterCardImportResult? parseCharacterCard(
                   : <String>[];
       final enabledRaw = e['enabled'];
       final constantRaw = e['constant'];
+      final rawSecondary = e['secondary_keys'] ?? (e['extensions'] is Map ? (e['extensions'] as Map)['secondary_keys'] : null);
+      final secondaryKeys = (rawSecondary is List)
+          ? rawSecondary.map((k) => k.toString().trim()).where((k) => k.isNotEmpty).toList(growable: false)
+          : const <String>[];
+      final selectiveLogicRaw = e['selectiveLogic'] ?? (e['extensions'] is Map ? (e['extensions'] as Map)['selectiveLogic'] : null);
+      final useRegexRaw = e['use_regex'] == true ||
+          (e['extensions'] is Map && (e['extensions'] as Map)['use_regex'] == true);
       entries.add({
         'id': const Uuid().v4(),
         'name': s(e['name'] ?? e['comment']),
         'enabled': enabledRaw is bool ? enabledRaw : true,
         'content': content,
         'keywords': keys,
+        'secondary_keys': secondaryKeys,
+        'selectiveLogic': selectiveLogicRaw is num ? selectiveLogicRaw.toInt() : 0,
+        'use_regex': useRegexRaw,
         'constantActive': constantRaw is bool ? constantRaw : (keys.isEmpty),
         'position': s(e['position']),
         'extensions': e['extensions'] is Map

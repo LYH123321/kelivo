@@ -141,12 +141,21 @@ class _WorldBookPageState extends State<WorldBookPage> {
                 : posRaw.contains('depth')
                     ? WorldBookInjectionPosition.atDepth
                     : WorldBookInjectionPosition.afterSystemPrompt;
+            final rawSecondary = e['secondary_keys'] ?? e['secondaryKeywords'];
+            final secondary = (rawSecondary is List)
+                ? rawSecondary.map((k) => k.toString().trim()).where((k) => k.isNotEmpty).toList(growable: false)
+                : const <String>[];
+            final selectiveLogic = (e['selectiveLogic'] as num?)?.toInt() ?? 0;
+            final useRegex = e['use_regex'] == true || (e['extensions'] is Map && (e['extensions'] as Map)['use_regex'] == true);
             return WorldBookEntry(
               id: (e['id'] ?? const Uuid().v4()).toString(),
               name: (e['name'] ?? '').toString(),
               enabled: (e['enabled'] as bool?) ?? true,
               content: (e['content'] ?? '').toString(),
               keywords: keys,
+              secondaryKeywords: secondary,
+              selectiveLogic: selectiveLogic,
+              useRegex: useRegex,
               constantActive: (e['constantActive'] as bool?) ?? false,
               position: pos,
             );

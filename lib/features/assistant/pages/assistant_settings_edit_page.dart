@@ -15,6 +15,10 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/st_preset_import.dart';
+import '../../../core/services/character_card_import.dart';
+import '../../../core/models/world_book.dart';
+import '../world_book/utils/world_book_import.dart' show normalizeImportedWorldBook, parseWorldBookImport;
+import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/memory/memory_prompts.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
@@ -83,6 +87,7 @@ part 'assistant_settings_edit_local_tools_tab.dart';
 part 'assistant_settings_edit_mcp_tab.dart';
 part 'assistant_settings_edit_quick_phrase_tab.dart';
 part 'assistant_settings_edit_custom_request_tab.dart';
+part 'assistant_settings_edit_world_book_tab.dart';
 
 const int _contextMessageMin = Assistant.minContextMessageSize;
 const int _contextMessageMax = Assistant.maxContextMessageSize;
@@ -160,6 +165,12 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       label: l10n.assistantEditPageRegexTab,
       icon: Lucide.CaseSensitive,
       child: AssistantRegexTab(assistantId: assistantId),
+    ),
+    _AssistantEditTabSpec(
+      id: 'world_book',
+      label: l10n.worldBookTitle,
+      icon: Lucide.BookOpen,
+      child: _AssistantWorldBookTab(assistantId: assistantId),
     ),
   ];
 }
