@@ -192,6 +192,10 @@ CharacterCardImportResult? parseCharacterCard(
                   : <String>[];
       final enabledRaw = e['enabled'];
       final constantRaw = e['constant'];
+      final exts = e['extensions'] is Map ? (e['extensions'] as Map).cast<String, dynamic>() : const <String, dynamic>{};
+      // ST (convertCharacterBook) only honors extensions.disable; the top-level
+      // `enabled` field is ignored by SillyTavern, so follow the same rule.
+      final isEnabled = !(exts['disable'] == true);
       final rawSecondary = e['secondary_keys'] ?? (e['extensions'] is Map ? (e['extensions'] as Map)['secondary_keys'] : null);
       final secondaryKeys = (rawSecondary is List)
           ? rawSecondary.map((k) => k.toString().trim()).where((k) => k.isNotEmpty).toList(growable: false)
@@ -202,7 +206,7 @@ CharacterCardImportResult? parseCharacterCard(
       entries.add({
         'id': const Uuid().v4(),
         'name': s(e['name'] ?? e['comment']),
-        'enabled': enabledRaw is bool ? enabledRaw : true,
+        'enabled': isEnabled,
         'content': content,
         'keywords': keys,
         'secondary_keys': secondaryKeys,
