@@ -17,7 +17,7 @@ import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/st_preset_import.dart';
 import '../../../core/services/character_card_import.dart';
 import '../../../core/models/world_book.dart';
-import '../world_book/utils/world_book_import.dart' show normalizeImportedWorldBook, parseWorldBookImport;
+import '../../world_book/utils/world_book_import.dart' show normalizeImportedWorldBook, parseWorldBookImport;
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/memory/memory_prompts.dart';
 import 'package:provider/provider.dart';

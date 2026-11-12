@@ -260,7 +260,7 @@ class _AssistantWorldBookTabState extends State<_AssistantWorldBookTab> {
                           size: 18, color: cs.primary),
                   const SizedBox(width: 8),
                   Text(
-                    l10n.worldBookTitle,
+                    AppLocalizations.of(context)!.worldBookTitle,
                     style: TextStyle(
                       color: cs.primary,
                       fontWeight: AppFontWeights.emphasis,
