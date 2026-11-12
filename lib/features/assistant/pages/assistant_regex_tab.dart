@@ -87,14 +87,14 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
       if (mounted) {
         showAppSnackBar(
           context,
-          AppLocalizations.of(context)!.regexImportDone(rules.length),
+          message: AppLocalizations.of(context)!.regexImportDone(rules.length),
         );
       }
     } catch (e) {
       if (mounted) {
         showAppSnackBar(
           context,
-          AppLocalizations.of(context)!.regexImportFailed(e.toString()),
+          message: AppLocalizations.of(context)!.regexImportFailed(e.toString()),
         );
       }
     }
@@ -293,6 +293,37 @@ class AssistantRegexDesktopPane extends StatefulWidget {
 }
 
 class _AssistantRegexDesktopPaneState extends State<AssistantRegexDesktopPane> {
+  Future<void> _importRegex() async {
+    final ap = context.read<AssistantProvider>();
+    final assistant = ap.getById(widget.assistantId);
+    if (assistant == null) return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final path = result.files.single.path;
+      if (path == null) return;
+      final rules = parseStRegexJson(await File(path).readAsString());
+      final list = List<AssistantRegex>.of(assistant.regexRules);
+      list.addAll(rules);
+      await ap.updateAssistant(assistant.copyWith(regexRules: list));
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.regexImportDone(rules.length),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.regexImportFailed(e.toString()),
+        );
+      }
+    }
+  }
   List<AssistantRegexScope> _normalizeScopes(
     Iterable<AssistantRegexScope> scopes,
   ) {
