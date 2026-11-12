@@ -12,6 +12,7 @@ import '../../../core/models/world_book.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/character_card_import.dart';
 import '../../../core/services/haptics.dart';
+import 'device_import_page.dart';
 import '../utils/world_book_import.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -368,6 +369,22 @@ class _WorldBookPageState extends State<WorldBookPage> {
         ),
         title: Text(l10n.worldBookTitle),
         actions: [
+          Tooltip(
+            message: 'Device Import',
+            child: IosIconButton(
+              icon: Lucide.FolderOpen,
+              minSize: 44,
+              size: 22,
+              onTap: () async {
+                Haptics.light();
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DeviceImportPage(),
+                  ),
+                );
+              },
+            ),
+          ),
           Tooltip(
             message: l10n.providersPageImportTooltip,
             child: IosIconButton(
