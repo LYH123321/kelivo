@@ -451,22 +451,42 @@ Future<String?> _showAddAssistantSheet(BuildContext context) async {
     if (lorebook.isNotEmpty && context.mounted) {
       final wb = context.read<WorldBookProvider>();
       final entries = lorebook
-          .map((e) => WorldBookEntry(
-                id: e['id'] as String? ?? const Uuid().v4(),
-                name: (e['name'] as String?) ?? '',
-                enabled: (e['enabled'] as bool?) ?? true,
-                content: (e['content'] as String?) ?? '',
-                keywords:
-                    (e['keywords'] as List?)?.map((k) => k.toString()).toList() ??
-                        const <String>[],
-                constantActive: (e['constantActive'] as bool?) ?? false,
-              ))
+          .map((e) {
+            final rawSecondary = e['secondary_keys'] as List?;
+            final posRaw = (e['position'] ?? '').toString().toLowerCase();
+            return WorldBookEntry(
+              id: e['id'] as String? ?? const Uuid().v4(),
+              name: (e['name'] as String?) ?? '',
+              enabled: (e['enabled'] as bool?) ?? true,
+              content: (e['content'] as String?) ?? '',
+              keywords:
+                  (e['keywords'] as List?)?.map((k) => k.toString()).toList() ??
+                      const <String>[],
+              secondaryKeywords: rawSecondary
+                  ?.map((k) => k.toString().trim())
+                  .where((k) => k.isNotEmpty)
+                  .toList(growable: false) ??
+                  const <String>[],
+              selectiveLogic: (e['selectiveLogic'] as num?)?.toInt() ?? 0,
+              useRegex: e['use_regex'] == true,
+              constantActive: (e['constantActive'] as bool?) ?? false,
+              position: posRaw.contains('before')
+                  ? WorldBookInjectionPosition.beforeSystemPrompt
+                  : posRaw.contains('depth')
+                      ? WorldBookInjectionPosition.atDepth
+                      : WorldBookInjectionPosition.afterSystemPrompt,
+            );
+          })
           .toList();
       await wb.addBook(WorldBook(
         id: const Uuid().v4(),
         name: import.card.name,
         entries: entries,
       ));
+      // Bind the imported book to the new assistant (whole-book binding,
+      // mirroring the world book tab behavior).
+      final added = wb.books.last;
+      await wb.toggleActiveBookId(added.id, assistantId: id);
     }
     if (!context.mounted) return;
     showAppSnackBar(

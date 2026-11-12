@@ -118,6 +118,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _ocrModelKey = 'ocr_model_v1';
   static const String _ocrPromptKey = 'ocr_prompt_v1';
   static const String _summaryModelKey = 'summary_model_v1';
+  static const String _embeddingModelKey = 'embedding_model_v1';
   static const String _summaryPromptKey = 'summary_prompt_v1';
   static const String _suggestionModelKey = 'suggestion_model_v1';
   static const String _suggestionGenerationEnabledKey =
@@ -808,6 +809,15 @@ class SettingsProvider extends ChangeNotifier {
     _ocrEnabled = prefs.getBool(_ocrEnabledKey) ?? false;
     if (_ocrModelProvider == null || _ocrModelId == null) {
       _ocrEnabled = false;
+    }
+    // load embedding model (for world book RAG)
+    final embedSel = prefs.getString(_embeddingModelKey);
+    if (embedSel != null && embedSel.contains('::')) {
+      final parts = embedSel.split('::');
+      if (parts.length >= 2) {
+        _embeddingModelProvider = parts[0];
+        _embeddingModelId = parts.sublist(1).join('::');
+      }
     }
     // load summary model
     final summarySel = prefs.getString(_summaryModelKey);
@@ -3786,6 +3796,8 @@ Do not interpret or translate—only transcribe and describe what is visually pr
   // Summary model and prompt
   String? _summaryModelProvider;
   String? _summaryModelId;
+  String? _embeddingModelProvider;
+  String? _embeddingModelId;
   String? get summaryModelProvider => _summaryModelProvider;
   String? get summaryModelId => _summaryModelId;
   String? get summaryModelKey =>
@@ -3828,6 +3840,25 @@ Generate or update a brief summary of the user's questions and intentions.
     notifyListeners();
     final prefs = _preferences;
     await prefs.remove(_summaryModelKey);
+  }
+
+  String? get embeddingModelProvider => _embeddingModelProvider;
+  String? get embeddingModelId => _embeddingModelId;
+  bool get hasEmbeddingModel =>
+      _embeddingModelProvider != null && _embeddingModelId != null;
+  Future<void> setEmbeddingModel(String providerKey, String modelId) async {
+    _embeddingModelProvider = providerKey;
+    _embeddingModelId = modelId;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setString(_embeddingModelKey, '$providerKey::$modelId');
+  }
+  Future<void> resetEmbeddingModel() async {
+    _embeddingModelProvider = null;
+    _embeddingModelId = null;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.remove(_embeddingModelKey);
   }
 
   Future<void> setSummaryPrompt(String prompt) async {
