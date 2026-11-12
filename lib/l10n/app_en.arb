@@ -7517,5 +7517,10 @@
   "responseSpeedProviderDependent": "Availability depends on your provider.",
   "responseSpeedTapTo": "Tap to switch to {mode}",
   "responseSpeedUltrafastNeedsResponses": "UltraFast requires the Responses API.",
-  "@responseSpeedTapTo": {"placeholders": {"mode": {"type": "String"}}}
+  "@responseSpeedTapTo": {"placeholders": {"mode": {"type": "String"}}},
+  "regexImportButton": "Import JSON",
+  "regexImportDone": "Imported {count} rules",
+  "regexImportFailed": "Import failed: {error}",
+  "@regexImportDone": {"placeholders": {"count": {"type": "int"}}},
+  "@regexImportFailed": {"placeholders": {"error": {"type": "String"}}}
 }

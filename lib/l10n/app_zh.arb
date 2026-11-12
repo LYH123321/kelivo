@@ -5853,5 +5853,8 @@
   "responseSpeedSelectionUnavailable": "之前选择的加速档位已不可用，此会话将使用标准模式。",
   "responseSpeedProviderDependent": "是否支持加速取决于当前供应商。",
   "responseSpeedTapTo": "点击切换为{mode}",
-  "responseSpeedUltrafastNeedsResponses": "UltraFast 需要启用 Responses API。"
+  "responseSpeedUltrafastNeedsResponses": "UltraFast 需要启用 Responses API。",
+  "regexImportButton": "导入 JSON",
+  "regexImportDone": "已导入 {count} 条规则",
+  "regexImportFailed": "导入失败: {error}"
 }

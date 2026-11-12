@@ -5831,5 +5831,8 @@
   "responseSpeedSelectionUnavailable": "先前選擇的加速檔位已不可用，此對話將使用標準模式。",
   "responseSpeedProviderDependent": "是否支援加速取決於目前的供應商。",
   "responseSpeedTapTo": "點擊切換為{mode}",
-  "responseSpeedUltrafastNeedsResponses": "UltraFast 需要啟用 Responses API。"
+  "responseSpeedUltrafastNeedsResponses": "UltraFast 需要啟用 Responses API。",
+  "regexImportButton": "匯入 JSON",
+  "regexImportDone": "已匯入 {count} 條規則",
+  "regexImportFailed": "匯入失敗: {error}"
 }

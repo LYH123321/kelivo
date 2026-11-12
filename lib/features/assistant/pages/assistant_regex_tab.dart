@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'dart:ui';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -12,6 +15,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/st_regex_import.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -62,6 +66,38 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
     final list = List<AssistantRegex>.of(assistant.regexRules)
       ..removeWhere((r) => r.id == rule.id);
     await ap.updateAssistant(assistant.copyWith(regexRules: list));
+  }
+
+  Future<void> _importRegex() async {
+    final ap = context.read<AssistantProvider>();
+    final assistant = ap.getById(widget.assistantId);
+    if (assistant == null) return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final path = result.files.single.path;
+      if (path == null) return;
+      final rules = parseStRegexJson(await File(path).readAsString());
+      final list = List<AssistantRegex>.of(assistant.regexRules);
+      list.addAll(rules);
+      await ap.updateAssistant(assistant.copyWith(regexRules: list));
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          AppLocalizations.of(context)!.regexImportDone(rules.length),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          AppLocalizations.of(context)!.regexImportFailed(e.toString()),
+        );
+      }
+    }
   }
 
   Future<void> _addOrEdit({AssistantRegex? rule}) async {
@@ -127,10 +163,41 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
                 ),
               ),
               const SizedBox(height: 24),
-              ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 200),
-                child: IosCardPress(
-                  onTap: () => _addOrEdit(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 160),
+                    child: IosCardPress(
+                      onTap: _importRegex,
+                      borderRadius: BorderRadius.circular(12),
+                      baseColor: cs.primary.withValues(alpha: isDark ? 0.18 : 0.12),
+                      pressedBlendStrength: 0.18,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Lucide.Import, size: 18, color: cs.primary),
+                          const SizedBox(width: 8),
+                          Text(
+                            l10n.regexImportButton,
+                            style: TextStyle(
+                              color: cs.primary,
+                              fontWeight: AppFontWeights.emphasis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(minWidth: 160),
+                    child: IosCardPress(
+                      onTap: () => _addOrEdit(),
                   borderRadius: BorderRadius.circular(12),
                   baseColor: cs.primary.withValues(alpha: isDark ? 0.18 : 0.12),
                   pressedBlendStrength: 0.18,
@@ -154,6 +221,8 @@ class _AssistantRegexTabState extends State<AssistantRegexTab> {
                     ],
                   ),
                 ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -331,6 +400,54 @@ class _AssistantRegexDesktopPaneState extends State<AssistantRegexDesktopPane> {
                         style: TextStyle(
                           fontSize: 13,
                           color: cs.onSurface.withValues(alpha: 0.65),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IosCardPress(
+                  onTap: _importRegex,
+                  borderRadius: BorderRadius.circular(12),
+                  baseColor: cs.primary.withValues(alpha: isDark ? 0.18 : 0.12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  pressedBlendStrength: 0.18,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Lucide.Import, size: 16, color: cs.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        l10n.regexImportButton,
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: AppFontWeights.emphasis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IosCardPress(
+                  onTap: _importRegex,
+                  borderRadius: BorderRadius.circular(12),
+                  baseColor: cs.primary.withValues(alpha: isDark ? 0.18 : 0.12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  pressedBlendStrength: 0.18,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Lucide.Import, size: 16, color: cs.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        l10n.regexImportButton,
+                        style: TextStyle(
+                          color: cs.primary,
+                          fontWeight: AppFontWeights.emphasis,
                         ),
                       ),
                     ],
