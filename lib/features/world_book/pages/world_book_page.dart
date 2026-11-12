@@ -1006,7 +1006,7 @@ class _WorldBookSectionState extends State<_WorldBookSection> {
                 : (entry.constantActive
                     ? l10n.worldBookAlwaysOnTag
                     : (entry.keywords.isNotEmpty
-                        ? '\${entry.keywords.length} 触发词'
+                        ? '${entry.keywords.length} 触发词'
                         : (entry.embedding.isNotEmpty ? 'RAG' : '未配置')));
             final canReorder = entries.length > 1;
 
