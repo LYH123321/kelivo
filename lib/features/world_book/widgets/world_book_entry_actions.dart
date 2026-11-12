@@ -274,7 +274,7 @@ class WorldBookEntrySelectionBar extends StatelessWidget {
                 action(
                   name: 'enable',
                   label: '启用',
-                  icon: Lucide.CheckCircle2,
+                  icon: Lucide.CheckCircle,
                   onPressed: busy || selectedCount == 0 ? null : onEnable,
                 ),
               if (onDisable != null)
