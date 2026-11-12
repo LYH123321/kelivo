@@ -185,7 +185,7 @@ WorldBookImportResult? parseWorldBookImport(
       final converted = WorldBookEntry(
         id: (entry['uid'] ?? key).toString(),
         name: comment.isNotEmpty ? comment : keys.firstOrNull ?? '',
-        enabled: !(entry['disable'] as bool? ?? false) && !unsupported,
+        enabled: !(entry['disable'] as bool? ?? false),
         // ST inserts larger orders later; Kelivo inserts higher priorities first.
         priority: -(entry['order'] as int? ?? 100),
         position: switch (position) {
