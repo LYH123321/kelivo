@@ -1487,6 +1487,7 @@ class _WorldBookEntryEditSheet extends StatefulWidget {
 class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   late final TextEditingController _nameController;
   late final TextEditingController _keywordInputController;
+  late final TextEditingController _secondaryInputController;
   late final TextEditingController _contentController;
   late final TextEditingController _priorityController;
   late final TextEditingController _scanDepthController;
@@ -1495,7 +1496,8 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   int _cooldown = 0;
   int _delay = 0;
   List<String> _keywords = <String>[];
-
+  List<String> _secondaryKeywords = <String>[];
+  int _selectiveLogic = 0;
   bool _enabled = true;
   bool _useRegex = false;
   bool _caseSensitive = false;
@@ -1509,6 +1511,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
     final entry = widget.entry;
     _nameController = TextEditingController(text: entry?.name ?? '');
     _keywordInputController = TextEditingController();
+    _secondaryInputController = TextEditingController();
     _contentController = TextEditingController(text: entry?.content ?? '');
     _priorityController = TextEditingController(
       text: (entry?.priority ?? 0).toString(),
@@ -1527,6 +1530,9 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
     _cooldown = entry?.cooldown ?? 0;
     _delay = entry?.delay ?? 0;
     _keywords = _cleanKeywords(entry?.keywords ?? const <String>[]);
+    _secondaryKeywords =
+        _cleanKeywords(entry?.secondaryKeywords ?? const <String>[]);
+    _selectiveLogic = entry?.selectiveLogic ?? 0;
     _position = entry?.position ?? WorldBookInjectionPosition.afterSystemPrompt;
     _role = entry?.role ?? WorldBookInjectionRole.user;
   }
@@ -1535,6 +1541,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
   void dispose() {
     _nameController.dispose();
     _keywordInputController.dispose();
+    _secondaryInputController.dispose();
     _contentController.dispose();
     _priorityController.dispose();
     _scanDepthController.dispose();
@@ -1602,6 +1609,102 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
         }
       });
       _keywordInputController.clear();
+    }
+    void addSecondaryFromInput() {
+      final parts = _parseKeywordInput(_secondaryInputController.text);
+      if (parts.isEmpty) return;
+      setState(() {
+        for (final k in parts) {
+          if (_secondaryKeywords.contains(k)) continue;
+          _secondaryKeywords.add(k);
+        }
+      });
+      _secondaryInputController.clear();
+    }
+    Future<void> pickSelectiveLogic() async {
+      final selected = await showModalBottomSheet<int>(
+        context: context,
+        backgroundColor: context.overlaySurface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        builder: (ctx) {
+          final localCs = Theme.of(ctx).colorScheme;
+          String label(int v) => switch (v) {
+                0 => 'AND ANY — 主关键词命中 且 任一二级命中才触发',
+                1 => 'NOT ANY — 命中任一二级关键词则排除',
+                2 => 'NOT ALL — 二级关键词未全部命中才触发',
+                _ => 'AND ANY',
+              };
+          Widget option(int v) {
+            final sel = _selectiveLogic == v;
+            return IosCardPress(
+              baseColor: Colors.transparent,
+              borderRadius: BorderRadius.zero,
+              pressedBlendStrength: 0,
+              pressedScale: 1.0,
+              haptics: false,
+              onTap: () => Navigator.of(ctx).pop(v),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        label(v),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.semibold,
+                          color: localCs.onSurface.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ),
+                    if (sel) Icon(Lucide.Check, size: 18, color: localCs.primary),
+                  ],
+                ),
+              ),
+            );
+          }
+          Widget divider() => Divider(
+                height: 6,
+                thickness: 0.6,
+                indent: 12,
+                endIndent: 12,
+                color: localCs.outlineVariant.withValues(alpha: 0.18),
+              );
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Text(
+                      '二级关键词逻辑 (Selective Logic)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: AppFontWeights.emphasis,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _IosSectionCard(
+                    children: [
+                      for (int i = 0; i < 3; i++) ...[
+                        option(i),
+                        if (i != 2) divider(),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+      if (selected == null) return;
+      setState(() => _selectiveLogic = selected);
     }
 
     Widget switchRow({
@@ -1747,6 +1850,51 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
       );
     }
 
+    Widget secondaryChip(String keyword) {
+      final color = cs.tertiary;
+      final bg = color.withValues(alpha: isDark ? 0.22 : 0.12);
+      final border = color.withValues(alpha: isDark ? 0.36 : 0.26);
+      return Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: border, width: 0.6),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Padding(
+                padding: const EdgeInsets.only(
+                  left: 10,
+                  right: 6,
+                  top: 6,
+                  bottom: 6,
+                ),
+                child: Text(
+                  keyword,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.semibold,
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                  ),
+                ),
+              ),
+            ),
+            IosIconButton(
+              icon: Lucide.X,
+              size: 14,
+              padding: const EdgeInsets.all(6),
+              color: cs.onSurface.withValues(alpha: 0.65),
+              onTap: () => setState(() => _secondaryKeywords.remove(keyword)),
+            ),
+            const SizedBox(width: 2),
+          ],
+        ),
+      );
+    }
     Future<void> pickPosition() async {
       final selected = await showModalBottomSheet<WorldBookInjectionPosition>(
         context: context,
@@ -2139,6 +2287,165 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                                   height: 1.2,
                                 ),
                               ),
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Text(
+                                    '二级关键词',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: AppFontWeights.emphasis,
+                                      color: cs.onSurface.withValues(alpha: 0.85),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  IosCardPress(
+                                    baseColor: context.appColors.surfaceFill,
+                                    borderRadius: BorderRadius.circular(8),
+                                    pressedScale: 0.98,
+                                    haptics: false,
+                                    onTap: _secondaryKeywords.isEmpty
+                                        ? null
+                                        : () => pickSelectiveLogic(),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      child: Text(
+                                        switch (_selectiveLogic) {
+                                          1 => 'NOT ANY',
+                                          2 => 'NOT ALL',
+                                          _ => 'AND ANY',
+                                        },
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: AppFontWeights.semibold,
+                                          color: _secondaryKeywords.isEmpty
+                                              ? cs.onSurface
+                                                  .withValues(alpha: 0.35)
+                                              : cs.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              if (_secondaryKeywords.isNotEmpty)
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    for (final k in _secondaryKeywords)
+                                      secondaryChip(k),
+                                  ],
+                                ),
+                              if (_secondaryKeywords.isNotEmpty)
+                                const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SizedBox(
+                                      height: 40,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: context.appColors.surfaceFill,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        alignment: Alignment.centerLeft,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 9,
+                                        ),
+                                        child: TextField(
+                                          controller:
+                                              _secondaryInputController,
+                                          onChanged: (_) => setState(() {}),
+                                          textInputAction:
+                                              TextInputAction.done,
+                                          onSubmitted: (_) =>
+                                              addSecondaryFromInput(),
+                                          textAlignVertical:
+                                              TextAlignVertical.center,
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight:
+                                                AppFontWeights.medium,
+                                            color: cs.onSurface.withValues(
+                                              alpha: 0.92,
+                                            ),
+                                            height: 1.15,
+                                          ),
+                                          decoration: InputDecoration(
+                                            isDense: true,
+                                            isCollapsed: true,
+                                            hintText: '添加二级关键词',
+                                            hintStyle: TextStyle(
+                                              fontSize: 15,
+                                              fontWeight:
+                                                  AppFontWeights.medium,
+                                              color: cs.onSurface.withValues(
+                                                alpha:
+                                                    isDark ? 0.42 : 0.46,
+                                              ),
+                                              height: 1.15,
+                                            ),
+                                            border: InputBorder.none,
+                                            contentPadding: EdgeInsets.zero,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  SizedBox(
+                                    width: 40,
+                                    height: 40,
+                                    child: Tooltip(
+                                      message: '添加二级关键词',
+                                      child: IosCardPress(
+                                        baseColor:
+                                            context.appColors.surfaceFill,
+                                        borderRadius:
+                                            BorderRadius.circular(12),
+                                        pressedScale: 0.98,
+                                        haptics: false,
+                                        onTap: _secondaryInputController.text
+                                                .trim()
+                                                .isEmpty
+                                            ? null
+                                            : () {
+                                                Haptics.light();
+                                                addSecondaryFromInput();
+                                              },
+                                        child: Center(
+                                          child: Icon(
+                                            Lucide.Plus,
+                                            size: 18,
+                                            color: cs.onSurface.withValues(
+                                              alpha: _secondaryInputController
+                                                      .text
+                                                      .trim()
+                                                      .isEmpty
+                                                  ? 0.35
+                                                  : 0.9,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '与主关键词配合过滤触发条件（酒馆 selectiveLogic）',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: cs.onSurface.withValues(alpha: 0.6),
+                                  height: 1.2,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -2247,6 +2554,9 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
                         injectDepth: injectDepth.clamp(0, 200).toInt(),
                         role: _role,
                         keywords: keywords,
+                        secondaryKeywords:
+                            List<String>.from(_secondaryKeywords),
+                        selectiveLogic: _selectiveLogic,
                         useRegex: _useRegex,
                         caseSensitive: _caseSensitive,
                         scanDepth: scanDepth.clamp(1, 200).toInt(),
